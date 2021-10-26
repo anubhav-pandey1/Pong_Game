@@ -93,7 +93,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 		unsigned int* pixel = (unsigned int*)buffer_memory;
 		for (int y = 0; y < buffer_height; y++) {
 			for (int x = 0; x < buffer_width; x++) {
-				*pixel++ = y * x * (x - y);
+				*pixel++ = (y*y)/4 + (x*x)/3 - (x*y);
 			}
 		}
 

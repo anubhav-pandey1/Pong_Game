@@ -97,7 +97,8 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 		// ------------ (2) Simulate stuff ---------------------
 		// render_background();
 		clear_screen(0xff5500);
-		draw_rect_in_pixels(50, 50, 200, 500, 0x00ff22);
+		// draw_rect_in_pixels(50, 50, 200, 500, 0x00ff22);
+		draw_rect(0, 0, 20, 20, 0x00ff22);
 
 		// ------------ (3) Render stuff on screen -------------
 		// StretchDIBits() copies the color data for a rectangle of pixels in a DIB/JPEG/PNG image to the specified destination rectangle

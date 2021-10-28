@@ -20,18 +20,24 @@
 // ------------------ (1) Player data ---------------------------
 float player_pos_y = 0.f;
 float player_pos_x = 0.f;
-float player_reg_speed = .2f; // Speed in units per sec
+float player_reg_speed = 7.5f; // Speed in units per sec
 
 internal void
-simulate_game(Input* input) {
+simulate_game(Input* input, float dt) {
 
 	clear_screen(0xff5500);
 
+	// Get player speed in units using delta time (independent of frame rate)
+	float player_speed = player_reg_speed * dt;
+
+	// Increase the player speed by a multiplier if SHIFT key is held down
+	if (is_down(BUTTON_SHIFT)) player_speed *= 1.75f;
+
 	// ------------- (2) Player Simulation ----------------------
-	if (is_down(BUTTON_UP)) player_pos_y += player_reg_speed;
-	if (is_down(BUTTON_DOWN)) player_pos_y -= player_reg_speed;
-	if (is_down(BUTTON_RIGHT)) player_pos_x += player_reg_speed;
-	if (is_down(BUTTON_LEFT)) player_pos_x -= player_reg_speed;
+	if (is_down(BUTTON_UP)) player_pos_y += player_speed;
+	if (is_down(BUTTON_DOWN)) player_pos_y -= player_speed;
+	if (is_down(BUTTON_RIGHT)) player_pos_x += player_speed;
+	if (is_down(BUTTON_LEFT)) player_pos_x -= player_speed;
 
 
 	draw_rect(player_pos_x, player_pos_y, 2, 2, 0x00ff22);

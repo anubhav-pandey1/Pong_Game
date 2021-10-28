@@ -15,45 +15,47 @@ global_variable bool running = true;
 global_variable Render_State render_state;
 
 #include "renderer.cpp"
+#include "platform_common.cpp"
+#include "game.cpp"
 
 // WndProc func to handle messages from Windows OS (event-driven)
 LRESULT CALLBACK window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 	LRESULT result = 0;
-	switch (uMsg)                   // If you receive close or destroy messages from Windows..
-	{
-	case WM_CLOSE:
-	case WM_DESTROY: {
-		running = false;            // ..Set running to be false so that the game loop stops
-	} break;
+	switch (uMsg) {                     // If you receive close or destroy messages from Windows..
+		case WM_CLOSE:
+		case WM_DESTROY: {
+			running = false;            // ..Set running to be false so that the game loop stops
+		} break;
 
-	case WM_SIZE: {                 // Recreate screen buffer whenever the window size is changed
-		RECT rect;                  // RECT structure defines a rectangle by the coordinates of its upper-left and lower-right corners
-		GetClientRect(hwnd, &rect); // Gives the coordinates of a window's client area ie. size of area below status bar
-		render_state.width = rect.right - rect.left;
-		render_state.height = rect.bottom - rect.top;
+		case WM_SIZE: {                 // Recreate screen buffer whenever the window size is changed
+			RECT rect;                  // RECT structure defines a rectangle by the coordinates of its upper-left and lower-right corners
+			GetClientRect(hwnd, &rect); // Gives the coordinates of a window's client area ie. size of area below status bar
+			render_state.width = rect.right - rect.left;
+			render_state.height = rect.bottom - rect.top;
 
-		int size = render_state.width * render_state.height * sizeof(u32);
+			int size = render_state.width * render_state.height * sizeof(u32);
 
-		// Free prev. buffer memory on changing size so that new buffer memory can be allocated
-		if (render_state.memory) VirtualFree(render_state.memory, 0, MEM_RELEASE); // Free all (specified by 0 and MEM_RELEASE) memory at address render_state.memory
-		render_state.memory = VirtualAlloc(0, size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE); // render_state.size memory allocated with READWRITE perms using MEM_COMMIT | MEM_RESERVE type allocation
+			// Free prev. buffer memory on changing size so that new buffer memory can be allocated
+			if (render_state.memory) VirtualFree(render_state.memory, 0, MEM_RELEASE); // Free all (specified by 0 and MEM_RELEASE) memory at address render_state.memory
+			render_state.memory = VirtualAlloc(0, size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE); // render_state.size memory allocated with READWRITE perms using MEM_COMMIT | MEM_RESERVE type allocation
 
-		// Bitmap_Info struct member initialization
-		render_state.bitmap_info.bmiHeader.biSize = sizeof(render_state.bitmap_info.bmiHeader); // The number of bytes required by the structure
-		render_state.bitmap_info.bmiHeader.biWidth = render_state.width;                        // width of the bitmap in pixels
-		render_state.bitmap_info.bmiHeader.biHeight = render_state.height;                      // height of the bitmap in pixels
-		render_state.bitmap_info.bmiHeader.biPlanes = 1;                                        // number of planes for the target device must be set to 1
-		render_state.bitmap_info.bmiHeader.biBitCount = 32;                                     // number of bits-per-pixel (32 bits since we're using u32 for each pixel)
-		render_state.bitmap_info.bmiHeader.biCompression = BI_RGB;                              // type of compression for a compressed bottom-up (ie. height > 0) bitmap, BI_RGB => uncompressed
+			// Bitmap_Info struct member initialization
+			render_state.bitmap_info.bmiHeader.biSize = sizeof(render_state.bitmap_info.bmiHeader); // The number of bytes required by the structure
+			render_state.bitmap_info.bmiHeader.biWidth = render_state.width;                        // width of the bitmap in pixels
+			render_state.bitmap_info.bmiHeader.biHeight = render_state.height;                      // height of the bitmap in pixels
+			render_state.bitmap_info.bmiHeader.biPlanes = 1;                                        // number of planes for the target device must be set to 1
+			render_state.bitmap_info.bmiHeader.biBitCount = 32;                                     // number of bits-per-pixel (32 bits since we're using u32 for each pixel)
+			render_state.bitmap_info.bmiHeader.biCompression = BI_RGB;                              // type of compression for a compressed bottom-up (ie. height > 0) bitmap, BI_RGB => uncompressed
 
-	} break;
+		} break;
 
-	default: // ..Otherwise, just create the default window procedure for the given parameters and return it
-		result = DefWindowProc(hwnd, uMsg, wParam, lParam);
+		default:                        // ..Otherwise, just create the default window procedure for the given parameters and return it
+			result = DefWindowProc(hwnd, uMsg, wParam, lParam);
 	}
 	return result;
 }
 
+// Entry Point for the Window-based game
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd) {
 
 	// Create a Window class that can be used to create our kind of windows
@@ -83,22 +85,64 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 
 	HDC hdc = GetDC(window);                  // Get Device context for our current window to be used as an argument for StretchDIBits()
 
+	Input input = {};                         // Empty Input struct to hold Button_State for all buttons
 
 	while (running) {
 
 		// ------------ (1) Take Input -------------------------
-		// Struct for messages from Windows (or from Users->Windows->our App)
-		MSG message;
-		while (PeekMessage(&message, window, 0, 0, PM_REMOVE)) {
-			TranslateMessage(&message);
-			DispatchMessage(&message);
+		// MSG Struct used for messages from Windows (or from Users->Windows->our App)
+		MSG msgInput;
+
+		// Reset .changed for all buttons to be false at the start of each frame (will be modified by switch (vk_code) when key pressed)
+		for (int i = 0; i < BUTTON_COUNT; i++) {
+			input.buttons[i].changed = false;
+		}
+
+		while (PeekMessage(&msgInput, window, 0, 0, PM_REMOVE)) {
+
+			switch (msgInput.message) {
+				case WM_KEYUP:
+				case WM_KEYDOWN: {                                            // *Note: Same code to be executed for KEYUP and KEYDOWN messages
+					u32 vk_code = (u32)msgInput.wParam;                       // vk_code tells which specific key was pressed
+
+					// Bit-twiddling to check if last bit is 0 ie. if the key with obtained vk_code is down or not (required due to *Note) 
+					bool curr_is_down = ((msgInput.lParam & (1 << 31)) == 0); 
+					// Additional notes on key state management:
+					// curr_is_down = false if the key went up during this frame and curr_is_down = true if the key went down during this frame
+					// We won't get WM_KEYUP or WM_KEYDOWN if the key state does not change from the previous frame (or will we?)
+			        // bool prev_is_down = ((msgInput.lParam & (1 << 30)) == 0);
+					// Transition state: (msgInput.lParam & (1 << 31)) is 1 by default, is 0 when the key is pressed in the curr frame
+					// Prev. key state: (msgInput.lParam & (1 << 30)) is 1 by default, is 0 when the key was pressed in the last frame
+
+					switch (vk_code) {
+
+						// ------------------- Multi-line Process_Button() Macro -----------------------------------------------------------------
+						// This basically checks ((WM_KEYUP || WM_KEYDOWN) && (vk_code == vk)) ie. if vk = b key went down/up during this frame
+						// Get if button b went down in this frame from curr_is_down and since it went down/up in this frame, it must have changed
+						#define process_button(b, vk)\
+						case vk: {\
+							input.buttons[b].is_down = curr_is_down;\
+							input.buttons[b].changed = true;\
+						} break;
+
+						// Processs all buttons using the pre-defined macro
+						process_button(BUTTON_UP, VK_UP);
+						process_button(BUTTON_DOWN, VK_DOWN);
+						process_button(BUTTON_LEFT, VK_LEFT);
+						process_button(BUTTON_RIGHT, VK_RIGHT);
+						process_button(BUTTON_SHIFT, VK_SHIFT);
+					}
+				} break;
+
+				default: {
+					TranslateMessage(&msgInput);
+					DispatchMessage(&msgInput);
+				}
+			}
 		}
 
 		// ------------ (2) Simulate stuff ---------------------
-		// render_background();
-		clear_screen(0xff5500);
-		// draw_rect_in_pixels(50, 50, 200, 500, 0x00ff22);
-		draw_rect(0, 0, 20, 20, 0x00ff22);
+		simulate_game(&input);
 
 		// ------------ (3) Render stuff on screen -------------
 		// StretchDIBits() copies the color data for a rectangle of pixels in a DIB/JPEG/PNG image to the specified destination rectangle

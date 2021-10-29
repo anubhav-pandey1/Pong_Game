@@ -87,6 +87,19 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 
 	Input input = {};                         // Empty Input struct to hold Button_State for all buttons
 
+	// ----------- Begin Frame - Time Delta Calculation -----------------
+
+	float delta_time = 0.016666f;                // 60 FPS assumed at the starting of the frame
+	LARGE_INTEGER frame_begin_time;              // Start ISO time stored using large_integer
+	QueryPerformanceCounter(&frame_begin_time);  // Store high resolution (<1us) time stamp in frame_begin_time
+
+	// Performance Frequency for Seconds per Frame
+	float performance_freq; {                    // Empty scope to store the perf-freq calculations
+		LARGE_INTEGER perf;
+		QueryPerformanceFrequency(&perf);        // Store Performance Frequency in perf
+		performance_freq = (float)perf.QuadPart; // Get 64-bit part from LARGE_INTEGER then convert to float
+	}
+
 	while (running) {
 
 		// ------------ (1) Take Input -------------------------
@@ -118,19 +131,23 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 
 						// ------------------- Multi-line Process_Button() Macro -----------------------------------------------------------------
 						// This basically checks ((WM_KEYUP || WM_KEYDOWN) && (vk_code == vk)) ie. if vk = b key went down/up during this frame
-						// Get if button b went down in this frame from curr_is_down and since it went down/up in this frame, it must have changed
+						// Get if button b went down or up in this frame from curr_is_down and since it did go down/up in this frame, it must have changed
 						#define process_button(b, vk)\
 						case vk: {\
 							input.buttons[b].is_down = curr_is_down;\
 							input.buttons[b].changed = true;\
 						} break;
 
-						// Processs all buttons using the pre-defined macro
+						// Processs all buttons using the macro (includes the cases for switch)
 						process_button(BUTTON_UP, VK_UP);
 						process_button(BUTTON_DOWN, VK_DOWN);
 						process_button(BUTTON_LEFT, VK_LEFT);
 						process_button(BUTTON_RIGHT, VK_RIGHT);
-						process_button(BUTTON_SHIFT, VK_SHIFT);
+						process_button(BUTTON_W, 'W');
+						process_button(BUTTON_S, 'S');
+						process_button(BUTTON_A, 'A');
+						process_button(BUTTON_D, 'D');
+						// process_button(BUTTON_SHIFT, VK_SHIFT);
 					}
 				} break;
 
@@ -142,7 +159,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 		}
 
 		// ------------ (2) Simulate stuff ---------------------
-		simulate_game(&input);
+		simulate_game(&input, delta_time);
 
 		// ------------ (3) Render stuff on screen -------------
 		// StretchDIBits() copies the color data for a rectangle of pixels in a DIB/JPEG/PNG image to the specified destination rectangle
@@ -161,6 +178,17 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 			DIB_RGB_COLORS,             // iUsage: whether bmiColors of BITMAPINFO struct contains explicit RGB values
 			SRCCOPY                     // rop: raster-operation specifies how src pixels and dest pixels are combined to form the new image
 		);                              // If the function succeeds, the return value is the number of scan lines copied
+
+		// ----------- End of Frame - Time Delta Calculation -----------------
+		// Must be inside running loop to capture end of frame time correctly
+
+		LARGE_INTEGER frame_end_time;              // End ISO time stored using large_integer
+		QueryPerformanceCounter(&frame_end_time);  // Store high resolution (<1us) time stamp in frame_end_time
+
+		// Calculate delta time in secs using QuadPart (high res, 64 bit) of the LARGE_INTEGER struct
+		// Divide the difference by secs per frame to get the delta time in seconds
+		delta_time = (float)(frame_end_time.QuadPart - frame_begin_time.QuadPart) / performance_freq;
+		frame_begin_time = frame_end_time;         // Curr. frame_end_time is the next frame_begin_time
 	}
-	return 0;
+
 }

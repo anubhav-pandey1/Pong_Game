@@ -13,7 +13,12 @@ enum {
 	BUTTON_DOWN,
 	BUTTON_LEFT,
 	BUTTON_RIGHT,
-	BUTTON_SHIFT,
+	BUTTON_W,
+	BUTTON_S,
+	BUTTON_A,
+	BUTTON_D,
+	// To simulate speed multiplier
+	// BUTTON_SHIFT,
 
 	// To keep track of count of keys here
 	BUTTON_COUNT,

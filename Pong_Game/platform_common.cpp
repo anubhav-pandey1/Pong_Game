@@ -11,9 +11,10 @@ struct Button_State {
 enum {
 	BUTTON_UP,
 	BUTTON_DOWN,
-	BUTTON_LEFT,
-	BUTTON_RIGHT,
-	BUTTON_SHIFT,
+	BUTTON_W,
+	BUTTON_S,
+	// To simulate speed multiplier
+	// BUTTON_SHIFT,
 
 	// To keep track of count of keys here
 	BUTTON_COUNT,

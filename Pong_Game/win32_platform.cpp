@@ -141,9 +141,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						// Processs all buttons using the macro (includes the cases for switch)
 						process_button(BUTTON_UP, VK_UP);
 						process_button(BUTTON_DOWN, VK_DOWN);
-						process_button(BUTTON_LEFT, VK_LEFT);
-						process_button(BUTTON_RIGHT, VK_RIGHT);
-						process_button(BUTTON_SHIFT, VK_SHIFT);
+						process_button(BUTTON_W, 'W');
+						process_button(BUTTON_S, 'S');
+						// process_button(BUTTON_SHIFT, VK_SHIFT);
 					}
 				} break;
 

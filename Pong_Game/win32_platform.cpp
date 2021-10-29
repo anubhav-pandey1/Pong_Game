@@ -141,8 +141,12 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						// Processs all buttons using the macro (includes the cases for switch)
 						process_button(BUTTON_UP, VK_UP);
 						process_button(BUTTON_DOWN, VK_DOWN);
+						process_button(BUTTON_LEFT, VK_LEFT);
+						process_button(BUTTON_RIGHT, VK_RIGHT);
 						process_button(BUTTON_W, 'W');
 						process_button(BUTTON_S, 'S');
+						process_button(BUTTON_A, 'A');
+						process_button(BUTTON_D, 'D');
 						// process_button(BUTTON_SHIFT, VK_SHIFT);
 					}
 				} break;
@@ -174,17 +178,17 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 			DIB_RGB_COLORS,             // iUsage: whether bmiColors of BITMAPINFO struct contains explicit RGB values
 			SRCCOPY                     // rop: raster-operation specifies how src pixels and dest pixels are combined to form the new image
 		);                              // If the function succeeds, the return value is the number of scan lines copied
+
+		// ----------- End of Frame - Time Delta Calculation -----------------
+		// Must be inside running loop to capture end of frame time correctly
+
+		LARGE_INTEGER frame_end_time;              // End ISO time stored using large_integer
+		QueryPerformanceCounter(&frame_end_time);  // Store high resolution (<1us) time stamp in frame_end_time
+
+		// Calculate delta time in secs using QuadPart (high res, 64 bit) of the LARGE_INTEGER struct
+		// Divide the difference by secs per frame to get the delta time in seconds
+		delta_time = (float)(frame_end_time.QuadPart - frame_begin_time.QuadPart) / performance_freq;
+		frame_begin_time = frame_end_time;         // Curr. frame_end_time is the next frame_begin_time
 	}
 
-	// ----------- End of Frame - Time Delta Calculation -----------------
-
-	LARGE_INTEGER frame_end_time;              // End ISO time stored using large_integer
-	QueryPerformanceCounter(&frame_end_time);  // Store high resolution (<1us) time stamp in frame_end_time
-
-	// Calculate delta time in secs using QuadPart (high res, 64 bit) of the LARGE_INTEGER struct
-	// Divide the difference by secs per frame to get the delta time in seconds
-	delta_time = (float)(frame_end_time.QuadPart - frame_begin_time.QuadPart) / performance_freq;
-	frame_begin_time = frame_end_time;         // Curr. frame_end_time is the next frame_begin_time
-
-	return 0;
 }

@@ -62,3 +62,23 @@ draw_rect(float x, float y, float half_size_x, float half_size_y, u32 color) {
 	// Change to pixels and draw it
 	draw_rect_in_pixels(x0, y0, x1, y1, color);
 }
+
+internal void
+draw_bounds(float arena_hsx, float arena_hsy, float line_hsx, float line_hsy, float player_hsx, float arena_cvg, u32 color) {
+	int gap = 2;
+
+	// Central Line
+	for (int y = -(int)arena_hsy + (int)line_hsy; y < (int)arena_hsy - (int)line_hsy; y += 2*line_hsy + gap) {
+		draw_rect(0, y + gap, line_hsx, line_hsy, color);
+	}
+
+	// Right-arena player boundary
+	for (int y = -(int)arena_hsy + (int)line_hsy; y < (int)arena_hsy - (int)line_hsy; y += line_hsy + .5f * gap) {
+		draw_rect((1.f - arena_cvg)*arena_hsx - 2*player_hsx, y + gap, .5f*line_hsx, .5f*line_hsy, color);
+	}
+
+	// Left-arena player boundary
+	for (int y = -(int)arena_hsy + (int)line_hsy; y < (int)arena_hsy - (int)line_hsy; y += line_hsy + .5f * gap) {
+		draw_rect(-(1.f - arena_cvg) * arena_hsx + 2*player_hsx, y + gap, .5f * line_hsx, .5f * line_hsy, color);
+	}
+}

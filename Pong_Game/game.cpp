@@ -27,16 +27,16 @@ const float arena_half_size_y = 45.f;
 // Ball Data
 float ball_hsx = 1.f;
 float ball_hsy = 1.f;
-float ball_py = 0.f, ball_dpy = 0.f;
+float ball_py = 0.f, ball_dpy = 1.f;
 float ball_px = 0.f, ball_dpx = 100.f;
-float ball_max_speed_x = 150.f;
+float ball_max_speed_x = 175.f;
 float ball_min_speed_x = 25.f;
 
 // Common Player Data
 float player_hsx = 2.5f;
 float player_hsy = 12.f;
 float player_px = 80.f;
-float arena_coverage = .6f;             // 60% of each arena side allowed to move in
+float arena_coverage = .6f;             // Default 60% of each arena side allowed to move in
 const bool is_player1_ai = false;
 const bool is_player2_ai = true;
 
@@ -58,6 +58,7 @@ int player2_score = 0;
 
 // ------------------ (4) Helper Functions -----------------------
 
+// ----------------- Simulate Player Helper ----------------------
 internal void
 simulate_player(float* player_py, float* player_dpy, float player_ddpy,
 	float* player_px, float* player_dpx, float player_ddpx, float dt) {
@@ -102,6 +103,7 @@ simulate_player(float* player_py, float* player_dpy, float player_ddpy,
 	}
 }
 
+// ----------------- AABB vs AABB Collision ----------------------
 internal bool
 aabb_vs_aabb(float ax, float ay, float a_hsx, float a_hsy,
 	float bx, float by, float b_hsx, float b_hsy) {
@@ -122,6 +124,22 @@ aabb_vs_aabb(float ax, float ay, float a_hsx, float a_hsy,
 		left_ball < right_player &&     // Collision in -ve X (right of player)
 		top_ball > bottom_player &&     // Collision in +ve Y (top side of player)
 		bottom_ball < top_player);      // Collision in -ve Y (bottom side of player)
+}
+
+// ----------------- AI Simulation Helper -----------------------
+internal void
+simulate_ai(const float* player_px, const float* player_py, float* player_ddpx, float* player_ddpy, const bool* player_hit_ball) {
+	float epsilon_y = 10.f;
+	if (ball_py - *player_py > epsilon_y) *player_ddpy += 750.f * ((ball_py - *player_py) / arena_half_size_y);        // Acc. based on dist from ball
+	else if (ball_py - *player_py < -epsilon_y) *player_ddpy -= 750.f * ((*player_py - ball_py) / arena_half_size_y);
+
+	if ((ball_px > (1.f - arena_coverage) * arena_half_size_x) ||
+		(ball_py - *player_py > epsilon_y) ||
+		(ball_py - *player_py < -epsilon_y) ||
+		*player_hit_ball)
+		*player_ddpx -= 350.f;
+	else if (ball_px < 0 && (*player_px + ((1.f - arena_coverage) * arena_half_size_x)))
+		*player_ddpx += 350.f;
 }
 
 internal void
@@ -156,6 +174,7 @@ simulate_game(Input* input, float dt) {
 				ball_px = player1_px + player_hsx + ball_hsy;
 			}
 			ball_dpy = player1_dpy * .75f;  // Bouncing back effect
+			ball_dpy += 1.5f * (ball_py - player1_py);
 		}
 		else if (aabb_vs_aabb(ball_px, ball_py, ball_hsx, ball_hsy, player2_px, player2_py, player_hsx, player_hsy)) {
 
@@ -172,6 +191,7 @@ simulate_game(Input* input, float dt) {
 				ball_px = player2_px - player_hsx - ball_hsy;
 			}
 			ball_dpy = player2_dpy * .75f;  // Bouncing back effect
+			ball_dpy += 1.5f* (ball_py - player2_py);
 		}
 
 		// Clamping ball's x velocity to prevent large built-up speeds
@@ -196,14 +216,14 @@ simulate_game(Input* input, float dt) {
 		int currTime = curr_time.QuadPart;    // Convert time stamp to integer
 
 		// Reset: Ball Collision with Arena Left and Right
-		if (ball_px + ball_hsx > 99.f) {       // Ball collision with right side of screen instead of arena
+		if (ball_px + ball_hsx > 99.f) {            // Ball collision with right side of screen instead of arena
 			ball_px = 0;
 			ball_py = 0;
 			ball_dpx = -100.f;
 			ball_dpy = currTime % 2 ? 30.f : -30.f; // Randomly decided spawn velocity direction of ball after reset
 			player2_score++;
 		}
-		else if (ball_px + ball_hsx < -99.f) { // Ball collision with left side of screen instead of arena
+		else if (ball_px + ball_hsx < -99.f) {      // Ball collision with left side of screen instead of arena
 			ball_px = 0;
 			ball_py = 0;
 			ball_dpx = 100.f;
@@ -221,43 +241,21 @@ simulate_game(Input* input, float dt) {
 		if (is_down(BUTTON_LEFT)) player1_ddpx -= 350.f;
 	}
 	else {
-		float epsilon_y = 10.f;
-		if (ball_py - player1_py > epsilon_y) player1_ddpy += 650.f;
-		else if (ball_py - player1_py < -epsilon_y) player1_ddpy -= 650.f;
-
-		float epsilon_x = 5.f;
-		if ((ball_px > (1.f - arena_coverage) * arena_half_size_x) ||
-			(ball_py - player1_py > epsilon_y) ||
-			(ball_py - player1_py < -epsilon_y) ||
-			player1_hit_ball)
-			player1_ddpx -= 350.f;
-		else if (ball_px < 0 && (player2_px + ((1.f - arena_coverage) * arena_half_size_x)))
-			player1_ddpx += 350.f;
+		simulate_ai(&player1_px, &player1_py, &player1_ddpx, &player1_ddpy, &player1_hit_ball);
 	}
 
 	simulate_player(&player1_py, &player1_dpy, player1_ddpy, &player1_px, &player1_dpx, player1_ddpx, dt);
 
 	// ------------- (7) Player 2 Simulation ----------------------
 	float player2_ddpy = 0.f, player2_ddpx = 0.f;
-	if (!is_player2_ai) {                                // Multiplayer if enemy is not AI
+	if (!is_player2_ai) {
 		if (is_down(BUTTON_W)) player2_ddpy += 650.f;
 		if (is_down(BUTTON_S)) player2_ddpy -= 650.f;
 		if (is_down(BUTTON_D)) player2_ddpx += 350.f;
 		if (is_down(BUTTON_A)) player2_ddpx -= 350.f;
 	}
-	else {                                             // Enemy AI
-		float epsilon_y = 10.f;
-		if (ball_py - player2_py > epsilon_y) player2_ddpy += 650.f;
-		else if (ball_py - player2_py < -epsilon_y) player2_ddpy -= 650.f;
-
-		float epsilon_x = 5.f;
-		if ((ball_px > (1.f - arena_coverage) * arena_half_size_x) ||
-			(ball_py - player2_py > epsilon_y) ||
-			(ball_py - player2_py < -epsilon_y) ||
-			player2_hit_ball)
-			player2_ddpx -= 350.f;
-		else if (ball_px < 0 && (player2_px + ((1.f - arena_coverage) * arena_half_size_x)))
-			player2_ddpx += 350.f;
+	else {
+		simulate_ai(&player2_px, &player2_py, &player2_ddpx, &player2_ddpy, &player2_hit_ball);
 	}
 
 	simulate_player(&player2_py, &player2_dpy, player2_ddpy, &player2_px, &player2_dpx, player2_ddpx, dt);
@@ -266,4 +264,7 @@ simulate_game(Input* input, float dt) {
 	draw_rect(ball_px, ball_py, ball_hsx, ball_hsy, 0xffff66);
 	draw_rect(player1_px, player1_py, player1_half_size_x, player1_half_size_y, 0x8B0000);
 	draw_rect(player2_px, player2_py, player2_half_size_x, player2_half_size_y, 0x8B0000);
+	// Display Scores
+	draw_number(player1_score, 10, 40, 1.f, 0xbbffbb);
+	draw_number(player2_score, -10, 40, 1.f, 0xbbffbb);
 }

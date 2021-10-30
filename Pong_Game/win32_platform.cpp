@@ -134,8 +134,8 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						// Get if button b went down or up in this frame from curr_is_down and since it did go down/up in this frame, it must have changed
 						#define process_button(b, vk)\
 						case vk: {\
+							input.buttons[b].changed = curr_is_down != input.buttons[b].is_down;\
 							input.buttons[b].is_down = curr_is_down;\
-							input.buttons[b].changed = true;\
 						} break;
 
 						// Processs all buttons using the macro (includes the cases for switch)
@@ -147,6 +147,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						process_button(BUTTON_S, 'S');
 						process_button(BUTTON_A, 'A');
 						process_button(BUTTON_D, 'D');
+						process_button(BUTTON_P, 'P');
 						// process_button(BUTTON_SHIFT, VK_SHIFT);
 					}
 				} break;

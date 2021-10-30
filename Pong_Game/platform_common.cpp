@@ -17,6 +17,7 @@ enum {
 	BUTTON_S,
 	BUTTON_A,
 	BUTTON_D,
+	BUTTON_P,
 	// To simulate speed multiplier
 	// BUTTON_SHIFT,
 

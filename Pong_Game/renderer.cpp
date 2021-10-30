@@ -85,21 +85,30 @@ draw_bounds(float arena_hsx, float arena_hsy, float line_hsx, float line_hsy, fl
 
 internal void
 draw_number(int number, float x, float y, float size, u32 color) {
+
 	float half_size = size * .5f;
+	bool drew_zero = false;      // To account for sole zero
+	while (number || !drew_zero) {
+		drew_zero = true;        // Set to true to prevent first place zero
 
-	bool drew_number = false;
-	while (number || !drew_number) {
-		drew_number = true;
-
-		int digit = number % 10;
-		number = number / 10;
+		int digit = number % 10; // Obtain the curr. digit (one's, ten's etc.)
+		number = number / 10;    // Reduce the no. so that one's digit can be obtained
 
 		switch (digit) {
 			case 0: {
+				// Left side of zero
 				draw_rect(x - size, y, half_size, 2.5f * size, color);
+
+				// Right side of zero
 				draw_rect(x + size, y, half_size, 2.5f * size, color);
+
+				// Top side of zero
 				draw_rect(x, y + size * 2.f, half_size, half_size, color);
+
+				// Bottom side of zero
 				draw_rect(x, y - size * 2.f, half_size, half_size, color);
+
+				// Reduce x by 4 * size to allow for next ten's/hundred's digit to be printed
 				x -= size * 4.f;
 			} break;
 
@@ -109,68 +118,128 @@ draw_number(int number, float x, float y, float size, u32 color) {
 			} break;
 
 			case 2: {
+				// Top side of two
 				draw_rect(x, y + size * 2.f, 1.5f * size, half_size, color);
+
+				// Middle rectangle of two
 				draw_rect(x, y, 1.5f * size, half_size, color);
+
+				// Bottom rectangle of two
 				draw_rect(x, y - size * 2.f, 1.5f * size, half_size, color);
+
+				// Top right rectangle of two
 				draw_rect(x + size, y + size, half_size, half_size, color);
+
+				// Bottom left rectange of two
 				draw_rect(x - size, y - size, half_size, half_size, color);
+
 				x -= size * 4.f;
 			} break;
 
 			case 3: {
+				// Top rectangle of three
 				draw_rect(x - half_size, y + size * 2.f, size, half_size, color);
+
+				// Middle rectangle of three
 				draw_rect(x - half_size, y, size, half_size, color);
+
+				// Bottom rectangle of three
 				draw_rect(x - half_size, y - size * 2.f, size, half_size, color);
+
+				// Vertical rectangle of three
 				draw_rect(x + size, y, half_size, 2.5f * size, color);
+
 				x -= size * 4.f;
 			} break;
 
 			case 4: {
+				// Right Vertical rectangle of four
 				draw_rect(x + size, y, half_size, 2.5f * size, color);
+
+				// Left Vertical rectangle of four (smaller)
 				draw_rect(x - size, y + size, half_size, 1.5f * size, color);
+
+				// Horizontal rectangle of four
 				draw_rect(x, y, half_size, half_size, color);
+
 				x -= size * 4.f;
 			} break;
 
 			case 5: {
+				// Five is horizontally flipped two
+
+				// Horizontal rectangles are same as two
 				draw_rect(x, y + size * 2.f, 1.5f * size, half_size, color);
 				draw_rect(x, y, 1.5f * size, half_size, color);
 				draw_rect(x, y - size * 2.f, 1.5f * size, half_size, color);
+
+				// Vertical rectangles have been flipped horizontally
 				draw_rect(x - size, y + size, half_size, half_size, color);
 				draw_rect(x + size, y - size, half_size, half_size, color);
+
 				x -= size * 4.f;
 			} break;
 
 			case 6: {
+				// Top rectangle of six
 				draw_rect(x + half_size, y + size * 2.f, size, half_size, color);
+
+				// Middle rectangle of six
 				draw_rect(x + half_size, y, size, half_size, color);
+
+				// Bottom rectangle of six
 				draw_rect(x + half_size, y - size * 2.f, size, half_size, color);
+
+				// Left vertical rectangle of six (large)
 				draw_rect(x - size, y, half_size, 2.5f * size, color);
+
+				// Right vertical rectangle of six (small)
 				draw_rect(x + size, y - size, half_size, half_size, color);
+
 				x -= size * 4.f;
 			} break;
 
 			case 7: {
+				// Vertical rectangle of seven
 				draw_rect(x + size, y, half_size, 2.5f * size, color);
+
+				// Horizontal rectangle of seven
 				draw_rect(x - half_size, y + size * 2.f, size, half_size, color);
+
 				x -= size * 4.f;
 			} break;
 
 			case 8: {
+				// Left vertical rectangle of eight
 				draw_rect(x - size, y, half_size, 2.5f * size, color);
+
+				// Right vertical rectangle of eight
 				draw_rect(x + size, y, half_size, 2.5f * size, color);
+
+				// Three horizontal rectangles of eight
 				draw_rect(x, y + size * 2.f, half_size, half_size, color);
 				draw_rect(x, y - size * 2.f, half_size, half_size, color);
 				draw_rect(x, y, half_size, half_size, color);
+
 				x -= size * 4.f;
 			} break;
 
 			case 9: {
+				// Top rectangle of nine
 				draw_rect(x - half_size, y + size * 2.f, size, half_size, color);
+
+				// Middle rectangle of nine
 				draw_rect(x - half_size, y, size, half_size, color);
+
+				// Bottom rectangle of nine 
 				draw_rect(x - half_size, y - size * 2.f, size, half_size, color);
+
+				// Large vertical rectangle of nine
 				draw_rect(x + size, y, half_size, 2.5f * size, color);
+
+				// Small vertical rectangle of nine (top left)
 				draw_rect(x - size, y + size, half_size, half_size, color);
+
 				x -= size * 4.f;
 			} break;
 		}

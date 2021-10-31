@@ -57,6 +57,8 @@ LRESULT CALLBACK window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 
 // Entry Point for the Window-based game
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd) {
+	// Do not show mouse cursor
+	ShowCursor(FALSE);
 
 	// Create a Window class that can be used to create our kind of windows
 	WNDCLASS window_class = {};
@@ -82,6 +84,14 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 			hInstance,                        // hInstance (optional): handle to the instance of the module to be associated with the window
 			0                                 // lpParam (optional): message is sent to the created window by this function before it returns
 		);                                    // If the function succeeds, the return value is a handle to the new window
+
+	// Set to always fullscreen
+	{
+		SetWindowLong(window, GWL_STYLE, GetWindowLong(window, GWL_STYLE) & ~WS_OVERLAPPEDWINDOW);
+		MONITORINFO mi = { sizeof(mi) };
+		GetMonitorInfo(MonitorFromWindow(window, MONITOR_DEFAULTTOPRIMARY), &mi);
+		SetWindowPos(window, HWND_TOP, mi.rcMonitor.left, mi.rcMonitor.top, mi.rcMonitor.right - mi.rcMonitor.left, mi.rcMonitor.bottom - mi.rcMonitor.top, SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+	}
 
 	HDC hdc = GetDC(window);                  // Get Device context for our current window to be used as an argument for StretchDIBits()
 
@@ -134,8 +144,8 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						// Get if button b went down or up in this frame from curr_is_down and since it did go down/up in this frame, it must have changed
 						#define process_button(b, vk)\
 						case vk: {\
+							input.buttons[b].changed = curr_is_down != input.buttons[b].is_down;\
 							input.buttons[b].is_down = curr_is_down;\
-							input.buttons[b].changed = true;\
 						} break;
 
 						// Processs all buttons using the macro (includes the cases for switch)
@@ -147,7 +157,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						process_button(BUTTON_S, 'S');
 						process_button(BUTTON_A, 'A');
 						process_button(BUTTON_D, 'D');
-						// process_button(BUTTON_SHIFT, VK_SHIFT);
+						process_button(BUTTON_P, 'P');
+						process_button(BUTTON_ENTER, VK_RETURN);
+						process_button(BUTTON_ESC, VK_ESCAPE);
 					}
 				} break;
 

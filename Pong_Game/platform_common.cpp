@@ -1,5 +1,5 @@
 
-// ---------------- State Management ------------------------------------
+// ---------------- Key State Management --------------------------------
 struct Button_State {
 	bool is_down;
 	bool changed;
@@ -17,14 +17,15 @@ enum {
 	BUTTON_S,
 	BUTTON_A,
 	BUTTON_D,
-	// To simulate speed multiplier
-	// BUTTON_SHIFT,
+	BUTTON_P,
+	BUTTON_ENTER,
+	BUTTON_ESC,
 
 	// To keep track of count of keys here
 	BUTTON_COUNT,
 };
 
-// ---------------- State Storage ---------------------------------------
+// ---------------- Key State Storage -----------------------------------
 // Struct to keep track of the inputs using an array of type Button_State
 struct Input {
 	Button_State buttons[BUTTON_COUNT];

@@ -84,22 +84,40 @@ draw_bounds(float arena_hsx, float arena_hsy, float line_hsx, float line_hsy, fl
 }
 
 internal void
+draw_arena(float arena_hsx, float arena_hsy, u32 arena_color, u32 outer_color) {
+	clear_screen(outer_color);
+	draw_rect(0, 0, arena_hsx, arena_hsy, arena_color);
+}
+
+// ---------------------------- Text Rendering --------------------------------------------
+
+// Primitive number rendering
+internal void
 draw_number(int number, float x, float y, float size, u32 color) {
+
 	float half_size = size * .5f;
+	bool drew_zero = false;      // To account for sole zero
+	while (number || !drew_zero) {
+		drew_zero = true;        // Set to true to prevent first place zero
 
-	bool drew_number = false;
-	while (number || !drew_number) {
-		drew_number = true;
-
-		int digit = number % 10;
-		number = number / 10;
+		int digit = number % 10; // Obtain the curr. digit (one's, ten's etc.)
+		number = number / 10;    // Reduce the no. so that one's digit can be obtained
 
 		switch (digit) {
 			case 0: {
+				// Left side of zero
 				draw_rect(x - size, y, half_size, 2.5f * size, color);
+
+				// Right side of zero
 				draw_rect(x + size, y, half_size, 2.5f * size, color);
+
+				// Top side of zero
 				draw_rect(x, y + size * 2.f, half_size, half_size, color);
+
+				// Bottom side of zero
 				draw_rect(x, y - size * 2.f, half_size, half_size, color);
+
+				// Reduce x by 4 * size to allow for next ten's/hundred's digit to be printed
 				x -= size * 4.f;
 			} break;
 
@@ -109,71 +127,384 @@ draw_number(int number, float x, float y, float size, u32 color) {
 			} break;
 
 			case 2: {
+				// Top side of two
 				draw_rect(x, y + size * 2.f, 1.5f * size, half_size, color);
+
+				// Middle rectangle of two
 				draw_rect(x, y, 1.5f * size, half_size, color);
+
+				// Bottom rectangle of two
 				draw_rect(x, y - size * 2.f, 1.5f * size, half_size, color);
+
+				// Top right rectangle of two
 				draw_rect(x + size, y + size, half_size, half_size, color);
+
+				// Bottom left rectange of two
 				draw_rect(x - size, y - size, half_size, half_size, color);
+
 				x -= size * 4.f;
 			} break;
 
 			case 3: {
+				// Top rectangle of three
 				draw_rect(x - half_size, y + size * 2.f, size, half_size, color);
+
+				// Middle rectangle of three
 				draw_rect(x - half_size, y, size, half_size, color);
+
+				// Bottom rectangle of three
 				draw_rect(x - half_size, y - size * 2.f, size, half_size, color);
+
+				// Vertical rectangle of three
 				draw_rect(x + size, y, half_size, 2.5f * size, color);
+
 				x -= size * 4.f;
 			} break;
 
 			case 4: {
+				// Right Vertical rectangle of four
 				draw_rect(x + size, y, half_size, 2.5f * size, color);
+
+				// Left Vertical rectangle of four (smaller)
 				draw_rect(x - size, y + size, half_size, 1.5f * size, color);
+
+				// Horizontal rectangle of four
 				draw_rect(x, y, half_size, half_size, color);
+
 				x -= size * 4.f;
 			} break;
 
 			case 5: {
+				// Five is horizontally flipped two
+
+				// Horizontal rectangles are same as two
 				draw_rect(x, y + size * 2.f, 1.5f * size, half_size, color);
 				draw_rect(x, y, 1.5f * size, half_size, color);
 				draw_rect(x, y - size * 2.f, 1.5f * size, half_size, color);
+
+				// Vertical rectangles have been flipped horizontally
 				draw_rect(x - size, y + size, half_size, half_size, color);
 				draw_rect(x + size, y - size, half_size, half_size, color);
+
 				x -= size * 4.f;
 			} break;
 
 			case 6: {
+				// Top rectangle of six
 				draw_rect(x + half_size, y + size * 2.f, size, half_size, color);
+
+				// Middle rectangle of six
 				draw_rect(x + half_size, y, size, half_size, color);
+
+				// Bottom rectangle of six
 				draw_rect(x + half_size, y - size * 2.f, size, half_size, color);
+
+				// Left vertical rectangle of six (large)
 				draw_rect(x - size, y, half_size, 2.5f * size, color);
+
+				// Right vertical rectangle of six (small)
 				draw_rect(x + size, y - size, half_size, half_size, color);
+
 				x -= size * 4.f;
 			} break;
 
 			case 7: {
+				// Vertical rectangle of seven
 				draw_rect(x + size, y, half_size, 2.5f * size, color);
+
+				// Horizontal rectangle of seven
 				draw_rect(x - half_size, y + size * 2.f, size, half_size, color);
+
 				x -= size * 4.f;
 			} break;
 
 			case 8: {
+				// Left vertical rectangle of eight
 				draw_rect(x - size, y, half_size, 2.5f * size, color);
+
+				// Right vertical rectangle of eight
 				draw_rect(x + size, y, half_size, 2.5f * size, color);
+
+				// Three horizontal rectangles of eight
 				draw_rect(x, y + size * 2.f, half_size, half_size, color);
 				draw_rect(x, y - size * 2.f, half_size, half_size, color);
 				draw_rect(x, y, half_size, half_size, color);
+
 				x -= size * 4.f;
 			} break;
 
 			case 9: {
+				// Top rectangle of nine
 				draw_rect(x - half_size, y + size * 2.f, size, half_size, color);
+
+				// Middle rectangle of nine
 				draw_rect(x - half_size, y, size, half_size, color);
+
+				// Bottom rectangle of nine 
 				draw_rect(x - half_size, y - size * 2.f, size, half_size, color);
+
+				// Large vertical rectangle of nine
 				draw_rect(x + size, y, half_size, 2.5f * size, color);
+
+				// Small vertical rectangle of nine (top left)
 				draw_rect(x - size, y + size, half_size, half_size, color);
+
 				x -= size * 4.f;
 			} break;
 		}
 
+	}
+}
+
+// Char textures using 2D arrays of c-strings
+const char* letters[][7] = {
+	" 00",
+	"0  0",
+	"0  0",
+	"0000",
+	"0  0",
+	"0  0",
+	"0  0",
+
+	"000",
+	"0  0",
+	"0  0",
+	"000",
+	"0  0",
+	"0  0",
+	"000",
+
+	" 000",
+	"0",
+	"0",
+	"0",
+	"0",
+	"0",
+	" 000",
+
+	"000",
+	"0  0",
+	"0  0",
+	"0  0",
+	"0  0",
+	"0  0",
+	"000",
+
+	"0000",
+	"0",
+	"0",
+	"000",
+	"0",
+	"0",
+	"0000",
+
+	"0000",
+	"0",
+	"0",
+	"000",
+	"0",
+	"0",
+	"0",
+
+	" 000",
+	"0",
+	"0",
+	"0 00",
+	"0  0",
+	"0  0",
+	" 000",
+
+	"0  0",
+	"0  0",
+	"0  0",
+	"0000",
+	"0  0",
+	"0  0",
+	"0  0",
+
+	"000",
+	" 0",
+	" 0",
+	" 0",
+	" 0",
+	" 0",
+	"000",
+
+	" 000",
+	"   0",
+	"   0",
+	"   0",
+	"0  0",
+	"0  0",
+	" 000",
+
+	"0  0",
+	"0  0",
+	"0 0",
+	"00",
+	"0 0",
+	"0  0",
+	"0  0",
+
+	"0",
+	"0",
+	"0",
+	"0",
+	"0",
+	"0",
+	"0000",
+
+	"00 00",
+	"0 0 0",
+	"0 0 0",
+	"0   0",
+	"0   0",
+	"0   0",
+	"0   0",
+
+	"00  0",
+	"0 0 0",
+	"0 0 0",
+	"0 0 0",
+	"0 0 0",
+	"0 0 0",
+	"0  00",
+
+	"0000",
+	"0  0",
+	"0  0",
+	"0  0",
+	"0  0",
+	"0  0",
+	"0000",
+
+	" 000",
+	"0  0",
+	"0  0",
+	"000",
+	"0",
+	"0",
+	"0",
+
+	" 000 ",
+	"0   0",
+	"0   0",
+	"0   0",
+	"0 0 0",
+	"0  0 ",
+	" 00 0",
+
+	"000",
+	"0  0",
+	"0  0",
+	"000",
+	"0  0",
+	"0  0",
+	"0  0",
+
+	" 000",
+	"0",
+	"0 ",
+	" 00",
+	"   0",
+	"   0",
+	"000 ",
+
+	"000",
+	" 0",
+	" 0",
+	" 0",
+	" 0",
+	" 0",
+	" 0",
+
+	"0  0",
+	"0  0",
+	"0  0",
+	"0  0",
+	"0  0",
+	"0  0",
+	" 00",
+
+	"0   0",
+	"0   0",
+	"0   0",
+	"0   0",
+	"0   0",
+	" 0 0",
+	"  0",
+
+	"0   0 ",
+	"0   0",
+	"0   0",
+	"0 0 0",
+	"0 0 0",
+	"0 0 0",
+	" 0 0 ",
+
+	"0   0",
+	"0   0",
+	" 0 0",
+	"  0",
+	" 0 0",
+	"0   0",
+	"0   0",
+
+	"0   0",
+	"0   0",
+	" 0 0",
+	"  0",
+	"  0",
+	"  0",
+	"  0",
+
+	"0000",
+	"   0",
+	"  0",
+	" 0",
+	"0",
+	"0",
+	"0000",
+
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"0",
+};
+
+// Char renderer function
+internal void
+draw_text(const char* text, float x, float y, float size, u32 color) {
+	float half_size = size * .5f;
+	float original_y = y;
+
+	while (*text) {                                 // While we don't react NULL termination
+		if (*text != 32) {                          // 32 is for space
+			const char** letter;
+
+			if (*text == 46) letter = letters[26];  // Full-stop dot
+			else letter = letters[*text - 'A'];     // Get ASCII code for letter
+
+			float original_x = x;                   // Save original x position to be used later
+
+			for (int i = 0; i < 7; i++) {           // Draw char using draw_rect() renderer
+				const char* row = letter[i];
+				while (*row) {
+					if (*row == '0') {
+						draw_rect(x, y, half_size, half_size, color);
+					}
+					x += size;
+					row++;
+				}
+				y -= size;
+				x = original_x;
+			}
+		}
+		text++;                                    // Go to next char in the input str                              
+		x += size * 6.f;                           // Increase x to print next letter (size*6 skipped if space)
+		y = original_y;                            // Reset y to the original y
 	}
 }

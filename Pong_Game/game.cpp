@@ -17,6 +17,36 @@
 
 // <------------------------- Game Simulation ----------------------------------------->
 
+// Game Mode
+enum Gamemode {
+	GM_MENU,
+	GM_GAMEPLAY,
+};
+
+Gamemode current_gamemode = GM_MENU;
+
+enum Menumode {
+	MN_MAIN,
+	MN_PLAY,
+	MN_STATS,
+	MN_QUIT,
+};
+
+Menumode current_menumode = MN_MAIN;
+int hot_gameplay_button;
+int hot_menu_button;
+int hot_quit_button;
+bool game_paused = false;
+
+// --------------------- Player stats ----------------------------
+struct Player_Stats {
+	int num_of_matches = 0;
+	int matches_won = 0;
+	int matches_lost = 0;
+	int points_scored = 0;
+	int points_lost = 0;
+};
+
 // ------------------ (1) Environment data -----------------------
 // Arena Data
 const float arena_px = 0.f;
@@ -36,9 +66,9 @@ float ball_min_speed_x = 25.f;
 float player_hsx = 2.5f;
 float player_hsy = 12.f;
 float player_px = 80.f;
-float arena_coverage = .6f;             // Default 60% of each arena side allowed to move in
-const bool is_player1_ai = false;
-const bool is_player2_ai = true;
+float arena_coverage = .6f;       // Default 60% of each arena side allowed to move in
+bool is_player1_ai = false;       // By default, player 1 is for the user
+bool is_player2_ai = true;        // By default, player 2 is the AI
 
 // ------------------ (2) Player1 data ---------------------------
 float player1_py, player1_dpy;          // Speed in units per second
@@ -130,141 +160,333 @@ aabb_vs_aabb(float ax, float ay, float a_hsx, float a_hsy,
 internal void
 simulate_ai(const float* player_px, const float* player_py, float* player_ddpx, float* player_ddpy, const bool* player_hit_ball) {
 	float epsilon_y = 10.f;
-	if (ball_py - *player_py > epsilon_y) *player_ddpy += 750.f * ((ball_py - *player_py) / arena_half_size_y);        // Acc. based on dist from ball
-	else if (ball_py - *player_py < -epsilon_y) *player_ddpy -= 750.f * ((*player_py - ball_py) / arena_half_size_y);
+	if (ball_py - *player_py > epsilon_y)
+		*player_ddpy += 750.f * ((ball_py - *player_py) / arena_half_size_y);        // Acc. based on dist from ball
+	else if (ball_py - *player_py < -epsilon_y)
+		*player_ddpy -= 750.f * ((*player_py - ball_py) / arena_half_size_y);
 
-	if ((ball_px > (1.f - arena_coverage) * arena_half_size_x) ||
-		(ball_py - *player_py > epsilon_y) ||
-		(ball_py - *player_py < -epsilon_y) ||
+	// TODO: Clean up AI code and create perfect mirrored AI for both sides
+	if (player_px < 0 && (ball_px > (1.f - arena_coverage) * arena_half_size_x) ||  // If ball is in the other player's court
+		// (ball_py - *player_py > epsilon_y) ||    // ie. Ball Y is greater than player_y: Out of vertical range
+		// (ball_py - *player_py < -epsilon_y) ||   // // ie. Ball Y is lower than player_y: Out of vertical range
 		*player_hit_ball)
-		*player_ddpx -= 350.f;
-	else if (ball_px < 0 && (*player_px + ((1.f - arena_coverage) * arena_half_size_x)))
 		*player_ddpx += 350.f;
+	else if	(player_px > 0 && (ball_px < -(1.f - arena_coverage) * arena_half_size_x) || // If ball is in the other player's court
+		*player_hit_ball)
+		*player_ddpx += 350.f;
+	// If the ball is in the player's vertical range
+	else if (player_px < 0 &&
+		(ball_py > 0 && ball_py - *player_py < epsilon_y) ||
+		(ball_py <= 0 && ball_py - *player_py > -epsilon_y))
+		*player_ddpx -= 350.f;
+	else if (player_px > 0 &&
+		(ball_py > 0 && ball_py - *player_py < epsilon_y) ||
+		(ball_py <= 0 && ball_py - *player_py > -epsilon_y))
+		*player_ddpx -= 350.f;
 }
 
 internal void
 simulate_game(Input* input, float dt) {
+	// ------------------ Gameplay System ---------------------------------
+	if (current_gamemode == GM_GAMEPLAY) {
 
-	clear_screen(0x006400);
+		// Pause Screen
+		if (pressed(BUTTON_P)) game_paused = !game_paused;
+		draw_rect(0, 0, 30, 15, 0x006400);
+		draw_text("PAUSED", -16, 2, 1, 0xffffff);
 
-	// ------------- (5) Env Simulation ---------------------------
-	// Draw the central arena
-	draw_rect(arena_px, arena_py, arena_half_size_x, arena_half_size_y, 0x000000);
-	draw_bounds(arena_half_size_x, arena_half_size_y, 1, 3, player_hsx, arena_coverage, 0xc0c0c0);
+		// Escape to Main Menu
+		if (pressed(BUTTON_ESC)) {
+			current_menumode = MN_MAIN;
+			current_gamemode = GM_MENU;
+		}
 
-	// Simulate the ball
-	{
-		// Equations of Motion:-
-		ball_px += ball_dpx * dt;
-		ball_py += ball_dpy * dt;
+		// Gameplay if game is not paused
+		if (!game_paused) {
 
-		// Ball Collision with Players :-
-		// aabb_vs_aabb() checks if there is a collision on any side
-		if (aabb_vs_aabb(ball_px, ball_py, ball_hsx, ball_hsy, player1_px, player1_py, player_hsx, player_hsy)) {
+			// ------------- (5) Env Simulation ---------------------------
 
-			player1_hit_ball = true;        // Set hit ball state for player 1 to be true
-			player2_hit_ball = false;       // Reset hit ball state for player 2 to allow AI movement
+			// Draw the central arena
+			draw_arena(arena_half_size_x, arena_half_size_y, 0x000000, 0x006400);
+			draw_bounds(arena_half_size_x, arena_half_size_y, 1, 3, player_hsx, arena_coverage, 0xc0c0c0);
 
-			if (player1_px > ball_px) {     // If the ball collides on the left side of player 1
-				ball_dpx *= -1.1f;
-				ball_px = player1_px - player_hsx - ball_hsy;
+			// Simulate the ball
+			{
+				// Equations of Motion:-
+				ball_px += ball_dpx * dt;
+				ball_py += ball_dpy * dt;
+
+				// Ball Collision with Players :-
+				float back_hit_coeff_x = -1.1f;
+				float front_hit_coeff_x = 1.1f;
+				float player_transfer_coeff_x = .5f;
+				float player_transfer_coeff_y = .75f;
+				float ball_pos_transfer_coeff_y = 1.5f;
+				// aabb_vs_aabb() checks if there is a collision on any side
+				if (aabb_vs_aabb(ball_px, ball_py, ball_hsx, ball_hsy, player1_px, player1_py, player_hsx, player_hsy)) {
+
+					player1_hit_ball = true;        // Set hit ball state for player 1 to be true
+					player2_hit_ball = false;       // Reset hit ball state for player 2 to allow AI movement
+
+					if (player1_px > ball_px) {     // If the ball collides on the left side of player 1
+						ball_dpx *= back_hit_coeff_x;
+						ball_px = player1_px - player_hsx - ball_hsy;
+					}
+					else {                          // If the ball collides on the right side of player 1
+						ball_dpx *= front_hit_coeff_x;
+						ball_dpx += player1_dpx * player_transfer_coeff_x;
+						ball_px = player1_px + player_hsx + ball_hsy;
+					}
+					ball_dpy = player1_dpy * player_transfer_coeff_y;  // Bouncing back effect
+					ball_dpy += ball_pos_transfer_coeff_y * (ball_py - player1_py);
+				}
+				else if (aabb_vs_aabb(ball_px, ball_py, ball_hsx, ball_hsy, player2_px, player2_py, player_hsx, player_hsy)) {
+
+					player2_hit_ball = true;        // Set hit ball state for player 2 to be true
+					player1_hit_ball = false;
+
+					if (player2_px < ball_px) {     // If the ball collides on the right side of player 2
+						ball_dpx *= back_hit_coeff_x;
+
+						ball_px = player2_px + player_hsx + ball_hsy;
+					}
+					else {                          // If the ball collides on the left side of player 2
+						ball_dpx *= front_hit_coeff_x;
+						ball_dpx += player2_dpx * player_transfer_coeff_x;
+						ball_px = player2_px - player_hsx - ball_hsy;
+					}
+					ball_dpy = player2_dpy * player_transfer_coeff_y;  // Bouncing back effect
+					ball_dpy += ball_pos_transfer_coeff_y * (ball_py - player2_py);
+				}
+
+				// Clamping ball's x velocity to prevent large built-up speeds
+				if (ball_dpx > ball_max_speed_x) ball_dpx = ball_max_speed_x;
+				else if (ball_dpx < -ball_max_speed_x) ball_dpx = -ball_max_speed_x;
+				else if (ball_dpx > 0 && ball_dpx < ball_min_speed_x) ball_dpx = ball_min_speed_x;
+				else if (ball_dpx < 0 && ball_dpx > -ball_min_speed_x) ball_dpx = -ball_min_speed_x;
+
+				// Ball Collision with Arena Top and Bottom
+				if (ball_py + ball_hsy > arena_half_size_y) {
+					ball_py = arena_half_size_y - ball_hsy;
+					ball_dpy *= -1;                 // Bouncing back effect
+				}
+				else if (ball_py - ball_hsy < -arena_half_size_y) {
+					ball_py = -arena_half_size_y + ball_hsy;
+					ball_dpy *= -1;                 // Bouncing back effect
+				}
+
+				// Random Integer Helpers
+				LARGE_INTEGER curr_time;              // ISO time stored using large_integer
+				QueryPerformanceCounter(&curr_time);  // Store high resolution (<1us) time stamp in curr_time
+				int currTime = curr_time.QuadPart;    // Convert time stamp to integer
+
+				// Reset: Ball Collision with Arena Left and Right
+				if (ball_px + ball_hsx > 99.f) {            // Ball collision with right side of screen instead of arena
+					ball_px = 0;
+					ball_py = 0;
+					ball_dpx = -100.f;
+					ball_dpy = currTime % 2 ? 30.f : -30.f; // Randomly decided spawn velocity direction of ball after reset
+					player2_score++;
+				}
+				else if (ball_px + ball_hsx < -99.f) {      // Ball collision with left side of screen instead of arena
+					ball_px = 0;
+					ball_py = 0;
+					ball_dpx = 100.f;
+					ball_dpy = currTime % 2 ? -30.f : 30.f; // Randomly decided spawn velocity direction of ball after reset
+					player1_score++;
+				}
 			}
-			else {                          // If the ball collides on the right side of player 1
-				ball_dpx *= 1.1f;
-				ball_px = player1_px + player_hsx + ball_hsy;
+
+			// ------------- (6) Player 1 Simulation ----------------------
+			float player1_ddpy = 0.f, player1_ddpx = 0.f;
+			if (!is_player1_ai) {
+				if (is_down(BUTTON_UP)) player1_ddpy += 650.f;
+				if (is_down(BUTTON_DOWN)) player1_ddpy -= 650.f;
+				if (is_down(BUTTON_RIGHT)) player1_ddpx += 350.f;
+				if (is_down(BUTTON_LEFT)) player1_ddpx -= 350.f;
 			}
-			ball_dpy = player1_dpy * .75f;  // Bouncing back effect
-			ball_dpy += 1.5f * (ball_py - player1_py);
-		}
-		else if (aabb_vs_aabb(ball_px, ball_py, ball_hsx, ball_hsy, player2_px, player2_py, player_hsx, player_hsy)) {
-
-			player2_hit_ball = true;        // Set hit ball state for player 2 to be true
-			player1_hit_ball = false;
-
-			if (player2_px < ball_px) {     // If the ball collides on the right side of player 2
-				ball_dpx *= -1.1f;
-
-				ball_px = player2_px + player_hsx + ball_hsy;
+			else {
+				simulate_ai(&player1_px, &player1_py, &player1_ddpx, &player1_ddpy, &player1_hit_ball);
 			}
-			else {                          // If the ball collides on the left side of player 2
-				ball_dpx *= 1.1f;
-				ball_px = player2_px - player_hsx - ball_hsy;
+
+			simulate_player(&player1_py, &player1_dpy, player1_ddpy, &player1_px, &player1_dpx, player1_ddpx, dt);
+
+			// ------------- (7) Player 2 Simulation ----------------------
+			float player2_ddpy = 0.f, player2_ddpx = 0.f;
+			if (!is_player2_ai) {
+				if (is_down(BUTTON_W)) player2_ddpy += 650.f;
+				if (is_down(BUTTON_S)) player2_ddpy -= 650.f;
+				if (is_down(BUTTON_D)) player2_ddpx += 350.f;
+				if (is_down(BUTTON_A)) player2_ddpx -= 350.f;
 			}
-			ball_dpy = player2_dpy * .75f;  // Bouncing back effect
-			ball_dpy += 1.5f* (ball_py - player2_py);
-		}
+			else {
+				simulate_ai(&player2_px, &player2_py, &player2_ddpx, &player2_ddpy, &player2_hit_ball);
+			}
 
-		// Clamping ball's x velocity to prevent large built-up speeds
-		if (ball_dpx > ball_max_speed_x) ball_dpx = ball_max_speed_x;
-		else if (ball_dpx < -ball_max_speed_x) ball_dpx = -ball_max_speed_x;
-		else if (ball_dpx > 0 && ball_dpx < ball_min_speed_x) ball_dpx = ball_min_speed_x;
-		else if (ball_dpx < 0 && ball_dpx > -ball_min_speed_x) ball_dpx = -ball_min_speed_x;
+			simulate_player(&player2_py, &player2_dpy, player2_ddpy, &player2_px, &player2_dpx, player2_ddpx, dt);
 
-		// Ball Collision with Arena Top and Bottom
-		if (ball_py + ball_hsy > arena_half_size_y) {
-			ball_py = arena_half_size_y - ball_hsy;
-			ball_dpy *= -1;                 // Bouncing back effect
-		}
-		else if (ball_py - ball_hsy < -arena_half_size_y) {
-			ball_py = -arena_half_size_y + ball_hsy;
-			ball_dpy *= -1;                 // Bouncing back effect
-		}
-
-		// Random Integer Helpers
-		LARGE_INTEGER curr_time;              // ISO time stored using large_integer
-		QueryPerformanceCounter(&curr_time);  // Store high resolution (<1us) time stamp in curr_time
-		int currTime = curr_time.QuadPart;    // Convert time stamp to integer
-
-		// Reset: Ball Collision with Arena Left and Right
-		if (ball_px + ball_hsx > 99.f) {            // Ball collision with right side of screen instead of arena
-			ball_px = 0;
-			ball_py = 0;
-			ball_dpx = -100.f;
-			ball_dpy = currTime % 2 ? 30.f : -30.f; // Randomly decided spawn velocity direction of ball after reset
-			player2_score++;
-		}
-		else if (ball_px + ball_hsx < -99.f) {      // Ball collision with left side of screen instead of arena
-			ball_px = 0;
-			ball_py = 0;
-			ball_dpx = 100.f;
-			ball_dpy = currTime % 2 ? -30.f : 30.f; // Randomly decided spawn velocity direction of ball after reset
-			player1_score++;
+			// ------------- (8) Rendering --------------------------------
+			draw_rect(ball_px, ball_py, ball_hsx, ball_hsy, 0xffff66);
+			draw_rect(player1_px, player1_py, player1_half_size_x, player1_half_size_y, 0x8B0000);
+			draw_rect(player2_px, player2_py, player2_half_size_x, player2_half_size_y, 0x8B0000);
+			// Display Scores
+			draw_number(player1_score, 10, 40, 1.f, 0xbbffbb);
+			draw_number(player2_score, -10, 40, 1.f, 0xbbffbb);
 		}
 	}
+	// ------------------ Menu System -------------------------------------
+	// Todo: Refactor into cleaner version
+	else if (current_gamemode == GM_MENU) {
+		clear_screen(0x006400);
 
-	// ------------- (6) Player 1 Simulation ----------------------
-	float player1_ddpy = 0.f, player1_ddpx = 0.f;
-	if (!is_player1_ai) {
-		if (is_down(BUTTON_UP)) player1_ddpy += 650.f;
-		if (is_down(BUTTON_DOWN)) player1_ddpy -= 650.f;
-		if (is_down(BUTTON_RIGHT)) player1_ddpx += 350.f;
-		if (is_down(BUTTON_LEFT)) player1_ddpx -= 350.f;
+		// Main Menu
+		if (current_menumode == MN_MAIN) {
+			// Main Menu Header
+			draw_rect(1, 35, 60, 15, 0x000000);
+			draw_text("PING PONG", -50, 40, 2, 0xffffff);
+
+			// Navigation between the two options
+			if (pressed(BUTTON_UP)) {
+				hot_menu_button = (3 + hot_menu_button - 1) % 3;
+			}
+
+			if (pressed(BUTTON_DOWN)) {
+				hot_menu_button = (hot_menu_button + 1) % 3;
+			}
+
+			// Play Game Selected
+			if (hot_menu_button == 0) {
+				draw_rect(-5, -2, 32, 8, 0x000000);
+				draw_text("PLAY GAME", -30, 1, 1, 0xff0000);
+				if (pressed(BUTTON_ENTER)) current_menumode = MN_PLAY;
+
+				draw_text("VIEW STATS", -33, -20, 1, 0xffffff);
+				draw_text("QUIT", -15, -38, 1, 0xffffff);
+			}
+			// View Stats Selected
+			else if (hot_menu_button == 1) {
+				draw_text("PLAY GAME", -30, 0, 1, 0xffffff);
+
+				draw_rect(-5, -22, 33, 8, 0x000000);
+				draw_text("VIEW STATS", -33, -19, 1, 0xff0000);
+				if (pressed(BUTTON_ENTER)) current_menumode = MN_STATS;
+
+				draw_text("QUIT", -15, -38, 1, 0xffffff);
+			}
+			// Quit Menu Selected
+			else if (hot_menu_button == 2) {
+				draw_text("PLAY GAME", -30, 0, 1, 0xffffff);
+				draw_text("VIEW STATS", -33, -20, 1, 0xffffff);
+
+				draw_rect(-5, -40, 15, 8, 0x000000);
+				draw_text("QUIT", -15, -37, 1, 0xff0000);
+				if (pressed(BUTTON_ENTER)) current_menumode = MN_QUIT;
+			}
+		}
+
+		// Play Game Menu
+		else if (current_menumode == MN_PLAY) {
+			// Play Game Menu Header
+			draw_rect(1, 35, 60, 15, 0x000000);
+			draw_text("GAME MODE", -50, 40, 2, 0xffffff);
+
+			// Go back to Main Menu
+			if (pressed(BUTTON_ESC)) {
+				current_menumode = MN_MAIN;
+			}
+
+			// Navigation between the two options
+			if (pressed(BUTTON_LEFT) || pressed(BUTTON_RIGHT)) {
+				hot_gameplay_button = !hot_gameplay_button;
+			}
+
+			// Select gamemode to enter gameplay
+			if (pressed(BUTTON_ENTER)) {
+				current_gamemode = GM_GAMEPLAY;
+				is_player2_ai = hot_gameplay_button ? 0 : 1;
+			}
+
+			// Single Player Selected
+			if (hot_gameplay_button == 0) {
+				draw_rect(-42, -12, 42, 8, 0x000000);
+				draw_text("SINGLE PLAYER", -80, -9, 1, 0xff0000);
+
+				draw_text("MULTIPLAYER", 20, -10, 1, 0xffffff);
+			}
+			// Multiplayer Selected
+			else {
+				draw_text("SINGLE PLAYER", -80, -10, 1, 0xffffff);
+
+				draw_rect(52, -12, 37, 8, 0x000000);
+				draw_text("MULTIPLAYER", 20, -9, 1, 0xff0000);
+			}
+		}
+
+		// Stats Menu
+		else if (current_menumode == MN_STATS) {
+			// Stats Menu Header
+			draw_rect(-2, 37, 42, 8, 0x000000);
+			draw_text("PLAYER STATS", -36, 40, 1, 0xffffff);
+
+			// Go back to Main Menu
+			if (pressed(BUTTON_ESC)) {
+				current_menumode = MN_MAIN;
+			}
+
+			draw_text("MATCHES PLAYED", -80, 20, 0.75, 0xffffff);
+			draw_number(50, 0, 18, 1.2, 0xff0000);
+
+			draw_text("MATCHES WON", -80, 5, 0.75, 0xffffff);
+			draw_number(50, 0, 3, 1.2, 0xff0000);
+
+			draw_text("MATCHES LOST", -80, -10, 0.75, 0xffffff);
+			draw_number(50, 0, -12, 1.2, 0xff0000);
+
+			draw_text("POINTS SCORED", -80, -25, 0.75, 0xffffff);
+			draw_number(50, 0, -27, 1.2, 0xff0000);
+
+			draw_text("POINTS LOST", -80, -40, 0.75, 0xffffff);
+			draw_number(50, 0, -42, 1.2, 0xff0000);
+		}
+
+		// Quit Menu
+		else if (current_menumode == MN_QUIT) {
+			// Quit Menu Header
+			draw_rect(1, 35, 60, 15, 0x000000);
+			draw_text("QUIT GAME", -50, 40, 2, 0xffffff);
+
+			draw_text("I WANT TO QUIT THE GAME", -68, 5, 1, 0xffffff);
+
+			// Go back to Main Menu
+			if (pressed(BUTTON_ESC)) {
+				current_menumode = MN_MAIN;
+			}
+
+			// Navigation between the two options
+			if (pressed(BUTTON_LEFT) || pressed(BUTTON_RIGHT)) {
+				hot_quit_button = !hot_quit_button;
+			}
+
+			// Select whether to quit or not
+			if (pressed(BUTTON_ENTER)) {
+				if (hot_quit_button == 0) running = false;
+				else current_menumode = MN_MAIN;
+			}
+
+			// Yes Selected
+			if (hot_quit_button == 0) {
+				draw_rect(-22, -18, 20, 8, 0x000000);
+				draw_text("YES", -30, -15, 1, 0xff0000);
+
+				draw_text("NO", 20, -16, 1, 0xffffff);
+			}
+			// No Selected
+			else {
+				draw_text("YES", -30, -16, 1, 0xffffff);
+
+				draw_rect(26, -18, 20, 8, 0x000000);
+				draw_text("NO", 20, -15, 1, 0xff0000);
+			}
+		}
 	}
-	else {
-		simulate_ai(&player1_px, &player1_py, &player1_ddpx, &player1_ddpy, &player1_hit_ball);
-	}
-
-	simulate_player(&player1_py, &player1_dpy, player1_ddpy, &player1_px, &player1_dpx, player1_ddpx, dt);
-
-	// ------------- (7) Player 2 Simulation ----------------------
-	float player2_ddpy = 0.f, player2_ddpx = 0.f;
-	if (!is_player2_ai) {
-		if (is_down(BUTTON_W)) player2_ddpy += 650.f;
-		if (is_down(BUTTON_S)) player2_ddpy -= 650.f;
-		if (is_down(BUTTON_D)) player2_ddpx += 350.f;
-		if (is_down(BUTTON_A)) player2_ddpx -= 350.f;
-	}
-	else {
-		simulate_ai(&player2_px, &player2_py, &player2_ddpx, &player2_ddpy, &player2_hit_ball);
-	}
-
-	simulate_player(&player2_py, &player2_dpy, player2_ddpy, &player2_px, &player2_dpx, player2_ddpx, dt);
-
-	// ------------- (8) Rendering --------------------------------
-	draw_rect(ball_px, ball_py, ball_hsx, ball_hsy, 0xffff66);
-	draw_rect(player1_px, player1_py, player1_half_size_x, player1_half_size_y, 0x8B0000);
-	draw_rect(player2_px, player2_py, player2_half_size_x, player2_half_size_y, 0x8B0000);
-	// Display Scores
-	draw_number(player1_score, 10, 40, 1.f, 0xbbffbb);
-	draw_number(player2_score, -10, 40, 1.f, 0xbbffbb);
 }

@@ -28,14 +28,24 @@ Gamemode current_gamemode = GM_MENU;
 enum Menumode {
 	MN_MAIN,
 	MN_PLAY,
+	MN_STATS,
+	MN_QUIT,
 };
 
 Menumode current_menumode = MN_MAIN;
 int hot_gameplay_button;
 int hot_menu_button;
-
-// Game stats
+int hot_quit_button;
 bool game_paused = false;
+
+// --------------------- Player stats ----------------------------
+struct Player_Stats {
+	int num_of_matches = 0;
+	int matches_won = 0;
+	int matches_lost = 0;
+	int points_scored = 0;
+	int points_lost = 0;
+};
 
 // ------------------ (1) Environment data -----------------------
 // Arena Data
@@ -336,8 +346,12 @@ simulate_game(Input* input, float dt) {
 			draw_text("PING PONG", -50, 40, 2, 0xffffff);
 
 			// Navigation between the two options
-			if (pressed(BUTTON_UP) || pressed(BUTTON_DOWN)) {
-				hot_menu_button = !hot_menu_button;
+			if (pressed(BUTTON_UP)) {
+				hot_menu_button = (3 + hot_menu_button - 1) % 3;
+			}
+
+			if (pressed(BUTTON_DOWN)) {
+				hot_menu_button = (hot_menu_button + 1) % 3;
 			}
 
 			// Play Game Selected
@@ -347,13 +361,26 @@ simulate_game(Input* input, float dt) {
 				if (pressed(BUTTON_ENTER)) current_menumode = MN_PLAY;
 
 				draw_text("VIEW STATS", -33, -20, 1, 0xffffff);
+				draw_text("QUIT", -15, -38, 1, 0xffffff);
 			}
 			// View Stats Selected
-			else {
+			else if (hot_menu_button == 1) {
 				draw_text("PLAY GAME", -30, 0, 1, 0xffffff);
 
 				draw_rect(-5, -22, 33, 8, 0x000000);
 				draw_text("VIEW STATS", -33, -19, 1, 0xff0000);
+				if (pressed(BUTTON_ENTER)) current_menumode = MN_STATS;
+
+				draw_text("QUIT", -15, -38, 1, 0xffffff);
+			}
+			// Quit Menu Selected
+			else if (hot_menu_button == 2) {
+				draw_text("PLAY GAME", -30, 0, 1, 0xffffff);
+				draw_text("VIEW STATS", -33, -20, 1, 0xffffff);
+
+				draw_rect(-5, -40, 15, 8, 0x000000);
+				draw_text("QUIT", -15, -37, 1, 0xff0000);
+				if (pressed(BUTTON_ENTER)) current_menumode = MN_QUIT;
 			}
 		}
 
@@ -382,7 +409,7 @@ simulate_game(Input* input, float dt) {
 			// Single Player Selected
 			if (hot_gameplay_button == 0) {
 				draw_rect(-42, -12, 42, 8, 0x000000);
-				draw_text("SINGLE PLAYER", -80, -10, 1, 0xff0000);
+				draw_text("SINGLE PLAYER", -80, -9, 1, 0xff0000);
 
 				draw_text("MULTIPLAYER", 20, -10, 1, 0xffffff);
 			}
@@ -391,7 +418,74 @@ simulate_game(Input* input, float dt) {
 				draw_text("SINGLE PLAYER", -80, -10, 1, 0xffffff);
 
 				draw_rect(52, -12, 37, 8, 0x000000);
-				draw_text("MULTIPLAYER", 20, -10, 1, 0xff0000);
+				draw_text("MULTIPLAYER", 20, -9, 1, 0xff0000);
+			}
+		}
+
+		// Stats Menu
+		else if (current_menumode == MN_STATS) {
+			// Stats Menu Header
+			draw_rect(-2, 37, 42, 8, 0x000000);
+			draw_text("PLAYER STATS", -36, 40, 1, 0xffffff);
+
+			// Go back to Main Menu
+			if (pressed(BUTTON_ESC)) {
+				current_menumode = MN_MAIN;
+			}
+
+			draw_text("MATCHES PLAYED", -80, 20, 0.75, 0xffffff);
+			draw_number(50, 0, 18, 1.2, 0xff0000);
+
+			draw_text("MATCHES WON", -80, 5, 0.75, 0xffffff);
+			draw_number(50, 0, 3, 1.2, 0xff0000);
+
+			draw_text("MATCHES LOST", -80, -10, 0.75, 0xffffff);
+			draw_number(50, 0, -12, 1.2, 0xff0000);
+
+			draw_text("POINTS SCORED", -80, -25, 0.75, 0xffffff);
+			draw_number(50, 0, -27, 1.2, 0xff0000);
+
+			draw_text("POINTS LOST", -80, -40, 0.75, 0xffffff);
+			draw_number(50, 0, -42, 1.2, 0xff0000);
+		}
+
+		// Quit Menu
+		else if (current_menumode == MN_QUIT) {
+			// Quit Menu Header
+			draw_rect(1, 35, 60, 15, 0x000000);
+			draw_text("QUIT GAME", -50, 40, 2, 0xffffff);
+
+			draw_text("I WANT TO QUIT THE GAME", -68, 5, 1, 0xffffff);
+
+			// Go back to Main Menu
+			if (pressed(BUTTON_ESC)) {
+				current_menumode = MN_MAIN;
+			}
+
+			// Navigation between the two options
+			if (pressed(BUTTON_LEFT) || pressed(BUTTON_RIGHT)) {
+				hot_quit_button = !hot_quit_button;
+			}
+
+			// Select whether to quit or not
+			if (pressed(BUTTON_ENTER)) {
+				if (hot_quit_button == 0) running = false;
+				else current_menumode = MN_MAIN;
+			}
+
+			// Yes Selected
+			if (hot_quit_button == 0) {
+				draw_rect(-22, -18, 20, 8, 0x000000);
+				draw_text("YES", -30, -15, 1, 0xff0000);
+
+				draw_text("NO", 20, -16, 1, 0xffffff);
+			}
+			// No Selected
+			else {
+				draw_text("YES", -30, -16, 1, 0xffffff);
+
+				draw_rect(26, -18, 20, 8, 0x000000);
+				draw_text("NO", 20, -15, 1, 0xff0000);
 			}
 		}
 	}

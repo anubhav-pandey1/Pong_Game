@@ -18,8 +18,8 @@ enum {
 	BUTTON_A,
 	BUTTON_D,
 	BUTTON_P,
-	// To simulate speed multiplier
-	// BUTTON_SHIFT,
+	BUTTON_ENTER,
+	BUTTON_ESC,
 
 	// To keep track of count of keys here
 	BUTTON_COUNT,

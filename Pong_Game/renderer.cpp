@@ -84,6 +84,15 @@ draw_bounds(float arena_hsx, float arena_hsy, float line_hsx, float line_hsy, fl
 }
 
 internal void
+draw_arena(float arena_hsx, float arena_hsy, u32 arena_color, u32 outer_color) {
+	clear_screen(outer_color);
+	draw_rect(0, 0, arena_hsx, arena_hsy, arena_color);
+}
+
+// ---------------------------- Text Rendering --------------------------------------------
+
+// Primitive number rendering
+internal void
 draw_number(int number, float x, float y, float size, u32 color) {
 
 	float half_size = size * .5f;
@@ -244,5 +253,258 @@ draw_number(int number, float x, float y, float size, u32 color) {
 			} break;
 		}
 
+	}
+}
+
+// Char textures using 2D arrays of c-strings
+const char* letters[][7] = {
+	" 00",
+	"0  0",
+	"0  0",
+	"0000",
+	"0  0",
+	"0  0",
+	"0  0",
+
+	"000",
+	"0  0",
+	"0  0",
+	"000",
+	"0  0",
+	"0  0",
+	"000",
+
+	" 000",
+	"0",
+	"0",
+	"0",
+	"0",
+	"0",
+	" 000",
+
+	"000",
+	"0  0",
+	"0  0",
+	"0  0",
+	"0  0",
+	"0  0",
+	"000",
+
+	"0000",
+	"0",
+	"0",
+	"000",
+	"0",
+	"0",
+	"0000",
+
+	"0000",
+	"0",
+	"0",
+	"000",
+	"0",
+	"0",
+	"0",
+
+	" 000",
+	"0",
+	"0",
+	"0 00",
+	"0  0",
+	"0  0",
+	" 000",
+
+	"0  0",
+	"0  0",
+	"0  0",
+	"0000",
+	"0  0",
+	"0  0",
+	"0  0",
+
+	"000",
+	" 0",
+	" 0",
+	" 0",
+	" 0",
+	" 0",
+	"000",
+
+	" 000",
+	"   0",
+	"   0",
+	"   0",
+	"0  0",
+	"0  0",
+	" 000",
+
+	"0  0",
+	"0  0",
+	"0 0",
+	"00",
+	"0 0",
+	"0  0",
+	"0  0",
+
+	"0",
+	"0",
+	"0",
+	"0",
+	"0",
+	"0",
+	"0000",
+
+	"00 00",
+	"0 0 0",
+	"0 0 0",
+	"0   0",
+	"0   0",
+	"0   0",
+	"0   0",
+
+	"00  0",
+	"0 0 0",
+	"0 0 0",
+	"0 0 0",
+	"0 0 0",
+	"0 0 0",
+	"0  00",
+
+	"0000",
+	"0  0",
+	"0  0",
+	"0  0",
+	"0  0",
+	"0  0",
+	"0000",
+
+	" 000",
+	"0  0",
+	"0  0",
+	"000",
+	"0",
+	"0",
+	"0",
+
+	" 000 ",
+	"0   0",
+	"0   0",
+	"0   0",
+	"0 0 0",
+	"0  0 ",
+	" 00 0",
+
+	"000",
+	"0  0",
+	"0  0",
+	"000",
+	"0  0",
+	"0  0",
+	"0  0",
+
+	" 000",
+	"0",
+	"0 ",
+	" 00",
+	"   0",
+	"   0",
+	"000 ",
+
+	"000",
+	" 0",
+	" 0",
+	" 0",
+	" 0",
+	" 0",
+	" 0",
+
+	"0  0",
+	"0  0",
+	"0  0",
+	"0  0",
+	"0  0",
+	"0  0",
+	" 00",
+
+	"0   0",
+	"0   0",
+	"0   0",
+	"0   0",
+	"0   0",
+	" 0 0",
+	"  0",
+
+	"0   0 ",
+	"0   0",
+	"0   0",
+	"0 0 0",
+	"0 0 0",
+	"0 0 0",
+	" 0 0 ",
+
+	"0   0",
+	"0   0",
+	" 0 0",
+	"  0",
+	" 0 0",
+	"0   0",
+	"0   0",
+
+	"0   0",
+	"0   0",
+	" 0 0",
+	"  0",
+	"  0",
+	"  0",
+	"  0",
+
+	"0000",
+	"   0",
+	"  0",
+	" 0",
+	"0",
+	"0",
+	"0000",
+
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"0",
+};
+
+// Char renderer function
+internal void
+draw_text(const char* text, float x, float y, float size, u32 color) {
+	float half_size = size * .5f;
+	float original_y = y;
+
+	while (*text) {                                 // While we don't react NULL termination
+		if (*text != 32) {                          // 32 is for space
+			const char** letter;
+
+			if (*text == 46) letter = letters[26];  // Full-stop dot
+			else letter = letters[*text - 'A'];     // Get ASCII code for letter
+
+			float original_x = x;                   // Save original x position to be used later
+
+			for (int i = 0; i < 7; i++) {           // Draw char using draw_rect() renderer
+				const char* row = letter[i];
+				while (*row) {
+					if (*row == '0') {
+						draw_rect(x, y, half_size, half_size, color);
+					}
+					x += size;
+					row++;
+				}
+				y -= size;
+				x = original_x;
+			}
+		}
+		text++;                                    // Go to next char in the input str                              
+		x += size * 6.f;                           // Increase x to print next letter (size*6 skipped if space)
+		y = original_y;                            // Reset y to the original y
 	}
 }

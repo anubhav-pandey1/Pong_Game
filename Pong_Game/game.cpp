@@ -28,9 +28,9 @@ enum Gamemode {
 };
 
 Gamemode current_gamemode = GM_MENU;
-const int curr_win_score = 21;
 
 // ------------------ (1) Environment data -----------------------
+
 // Arena Data
 const float arena_px = 0.f;
 const float arena_py = 0.f;
@@ -49,6 +49,7 @@ float ball_min_speed_x = 25.f;
 float player_hsx = 2.5f;
 float player_hsy = 12.f;
 float player_px = 80.f;
+const int win_score = 21;         // Default 21 pts is the win condition
 float arena_coverage = .6f;       // Default 60% of each arena side allowed to move in
 bool is_player1_ai = false;       // By default, player 1 is for the user
 bool is_player2_ai = true;        // By default, player 2 is the AI
@@ -394,7 +395,7 @@ reset_game() {
 	current_gamemode = GM_MENU;
 }
 
-
+// ---------------- Main Game Simulation ------------------------
 internal void
 simulate_game(Input* input, float dt) {
 	// ------------------ Gameplay System ---------------------------------
@@ -493,7 +494,7 @@ simulate_game(Input* input, float dt) {
 					ball_dpy = currTime % 2 ? 30.f : -30.f; // Randomly decided spawn velocity direction of ball after reset
 					player2_score++;
 					stats.array[POINTS_LOST]++;
-					if (player2_score == curr_win_score) {
+					if (player2_score == win_score) {
 						stats.array[MATCHES_LOST]++;
 						current_gamemode = GM_LOSESTATE;
 					}
@@ -505,7 +506,7 @@ simulate_game(Input* input, float dt) {
 					ball_dpy = currTime % 2 ? -30.f : 30.f; // Randomly decided spawn velocity direction of ball after reset
 					player1_score++;
 					stats.array[POINTS_SCORED]++;
-					if (player1_score == curr_win_score) {
+					if (player1_score == win_score) {
 						stats.array[MATCHES_WON]++;
 						current_gamemode = GM_WINSTATE;
 					}
@@ -601,7 +602,8 @@ simulate_game(Input* input, float dt) {
 	else if (current_gamemode == GM_WINSTATE) {
 
 		draw_rect(0, 0, 60, 30, 0x006400);
-		draw_text("YOU WON", -19, 12, 1, 0xffffff);
+		if (is_player2_ai) draw_text("YOU WON", -19, 12, 1, 0xffffff);
+		else draw_text("PLAYER I WON", -35, 12, 1, 0xffffff);
 
 		draw_rect(1, -11, 20, 8, 0x000000);
 		draw_text("OK", -4, -8, 1, 0xff0000);
@@ -613,7 +615,8 @@ simulate_game(Input* input, float dt) {
 	else if (current_gamemode == GM_LOSESTATE) {
 		// stats.array[MATCHES_LOST]++;
 		draw_rect(0, 0, 60, 30, 0x006400);
-		draw_text("YOU LOST", -21, 12, 1, 0xffffff);
+		if (is_player2_ai) draw_text("YOU LOST", -21, 12, 1, 0xffffff);
+		else draw_text("PLAYER II WON", -36, 12, 1, 0xffffff);
 
 		draw_rect(1, -11, 20, 8, 0x000000);
 		draw_text("OK", -4, -8, 1, 0xff0000);

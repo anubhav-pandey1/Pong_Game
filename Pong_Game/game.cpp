@@ -493,9 +493,11 @@ internal void
 reset_game() {
 	player1_score = 0, player2_score = 0;
 	player1_px = player_px, player2_px = -player_px;
+	player1_py = 0, player2_py = 0;
+	player1_dpx = 0, player1_dpy = 0;
+	player2_dpx = 0, player2_dpy = 0;
 	ball_py = 0.f, ball_dpy = 1.f;
 	ball_px = 0.f, ball_dpx = 100.f;
-	player1_py = 0, player2_py = 0;
 	current_menumode = MN_MAIN;
 	current_gamemode = GM_MENU;
 }

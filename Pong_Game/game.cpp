@@ -96,35 +96,94 @@ enum Player_Stats {
 	STATS_COUNT,
 };
 
-struct Stats{
-	unsigned int array[STATS_COUNT];
-};
+struct {
+	char* data;
+	unsigned int size;
+} typedef String;
 
-Stats stats = {};
+struct {
+	u32 version;
+	unsigned int stats[STATS_COUNT];
+} typedef Save_Data;
+
+Save_Data save_data = {};
 
 // ------------ Helper Functions for Stats -----------------------
-//#include <iostream>
-//
-//internal void
-//get_player_stats() {
-//	freopen("Player_Stats.txt", "r", stdin);
-//	int curr_stats_idx = 0, curr_stats_val;
-//	while (curr_stats_idx < STATS_COUNT) {
-//		std::cin >> curr_stats_val;
-//		stats.array[curr_stats_idx] = curr_stats_val;
-//		curr_stats_idx++;
-//	}
-//}
-//
-//internal void
-//set_player_stats() {
-//	freopen("Player_Stats.txt", "w", stdin);
-//	int curr_stats_idx = 0, curr_stats_val;
-//	while (curr_stats_idx < STATS_COUNT) {
-//		int curr_stats_val = stats.array[curr_stats_idx];
-//		std::cout << curr_stats_val;
-//	}
-//}
+#include <cassert>
+
+internal void
+os_free_file(String s) {
+	VirtualFree(s.data, 0, MEM_RELEASE);
+}
+
+internal String
+os_read_entire_file(const char* file_path) {
+	String result = { 0 };
+
+	HANDLE file_handle = CreateFileA(file_path, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0);
+	if (file_handle == INVALID_HANDLE_VALUE) {
+		CloseHandle(file_handle);
+		return result;
+	}
+
+	DWORD file_size = GetFileSize(file_handle, 0);
+	result.size = file_size;
+	result.data = (char*)VirtualAlloc(0, result.size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+
+
+	DWORD bytes_read;
+	if (ReadFile(file_handle, result.data, file_size, &bytes_read, 0) && file_size == bytes_read) {
+		// Success;
+
+	}
+	else {
+		// @Incomplete: error message?
+		assert(0);
+	}
+
+	CloseHandle(file_handle);
+	return result;
+}
+
+internal String
+os_read_save_file() {
+	return os_read_entire_file("save.pong");
+}
+
+internal int
+os_write_save_file(String data) {
+	int result = false;
+
+	HANDLE file_handle = CreateFileA("./save.pong", GENERIC_WRITE, 0, 0, CREATE_ALWAYS, 0, 0);
+	if (file_handle == INVALID_HANDLE_VALUE) {
+		assert(0);
+		return result;
+	}
+
+	DWORD bytes_written;
+	result = WriteFile(file_handle, data.data, (DWORD)data.size, &bytes_written, 0) && bytes_written == data.size;
+
+	CloseHandle(file_handle);
+	return result;
+}
+
+internal void
+load_game() {
+	String input = os_read_save_file();
+	if (input.size) {
+		u32 version = *(u32*)input.data;
+		save_data = *(Save_Data*)input.data;
+	}
+}
+
+internal void
+save_game() {
+	// Do that async
+	String data;
+	data.data = (char*)&save_data;
+	data.size = sizeof(save_data);
+	os_write_save_file(data);
+}
 
 // -------------------- Menu Function ----------------------------
 // Todo: Refactor into cleaner version
@@ -196,7 +255,7 @@ manage_menu(Input* input) {
 		// Select gamemode to enter gameplay
 		if (pressed(BUTTON_ENTER)) {
 			current_gamemode = GM_GAMEPLAY;
-			stats.array[NUM_OF_MATCHES]++;                      // Entry point for GM_GAMEPLAY so increase stats here
+			save_data.stats[NUM_OF_MATCHES]++;                      // Entry point for GM_GAMEPLAY so increase stats here
 			is_player2_ai = hot_gameplay_button ? 0 : 1;
 		}
 
@@ -218,6 +277,7 @@ manage_menu(Input* input) {
 
 	// Stats Menu
 	else if (current_menumode == MN_STATS) {
+		load_game();
 		// Stats Menu Header
 		draw_rect(-2, 37, 42, 8, 0x000000);
 		draw_text("PLAYER STATS", -36, 40, 1, 0xffffff);
@@ -228,19 +288,19 @@ manage_menu(Input* input) {
 		}
 
 		draw_text("MATCHES PLAYED", -80, 20, 0.75, 0xffffff);
-		draw_number(stats.array[NUM_OF_MATCHES], 0, 18, 1.2, 0xff0000);
+		draw_number(save_data.stats[NUM_OF_MATCHES], 0, 18, 1.2, 0xff0000);
 
 		draw_text("MATCHES WON", -80, 5, 0.75, 0xffffff);
-		draw_number(stats.array[MATCHES_WON], 0, 3, 1.2, 0xff0000);
+		draw_number(save_data.stats[MATCHES_WON], 0, 3, 1.2, 0xff0000);
 
 		draw_text("MATCHES LOST", -80, -10, 0.75, 0xffffff);
-		draw_number(stats.array[MATCHES_LOST], 0, -12, 1.2, 0xff0000);
+		draw_number(save_data.stats[MATCHES_LOST], 0, -12, 1.2, 0xff0000);
 
 		draw_text("POINTS SCORED", -80, -25, 0.75, 0xffffff);
-		draw_number(stats.array[POINTS_SCORED], 0, -27, 1.2, 0xff0000);
+		draw_number(save_data.stats[POINTS_SCORED], 0, -27, 1.2, 0xff0000);
 
 		draw_text("POINTS LOST", -80, -40, 0.75, 0xffffff);
-		draw_number(stats.array[POINTS_LOST], 0, -42, 1.2, 0xff0000);
+		draw_number(save_data.stats[POINTS_LOST], 0, -42, 1.2, 0xff0000);
 	}
 
 	// Quit Menu
@@ -493,9 +553,9 @@ simulate_game(Input* input, float dt) {
 					ball_dpx = -100.f;
 					ball_dpy = currTime % 2 ? 30.f : -30.f; // Randomly decided spawn velocity direction of ball after reset
 					player2_score++;
-					stats.array[POINTS_LOST]++;
+					save_data.stats[POINTS_LOST]++;
 					if (player2_score == win_score) {
-						stats.array[MATCHES_LOST]++;
+						save_data.stats[MATCHES_LOST]++;
 						current_gamemode = GM_LOSESTATE;
 					}
 				}
@@ -505,9 +565,9 @@ simulate_game(Input* input, float dt) {
 					ball_dpx = 100.f;
 					ball_dpy = currTime % 2 ? -30.f : 30.f; // Randomly decided spawn velocity direction of ball after reset
 					player1_score++;
-					stats.array[POINTS_SCORED]++;
+					save_data.stats[POINTS_SCORED]++;
 					if (player1_score == win_score) {
-						stats.array[MATCHES_WON]++;
+						save_data.stats[MATCHES_WON]++;
 						current_gamemode = GM_WINSTATE;
 					}
 				}
@@ -600,7 +660,7 @@ simulate_game(Input* input, float dt) {
 	}
 
 	else if (current_gamemode == GM_WINSTATE) {
-
+		save_game();
 		draw_rect(0, 0, 60, 30, 0x006400);
 		if (is_player2_ai) draw_text("YOU WON", -19, 12, 1, 0xffffff);
 		else draw_text("PLAYER I WON", -35, 12, 1, 0xffffff);
@@ -613,7 +673,7 @@ simulate_game(Input* input, float dt) {
 	}
 
 	else if (current_gamemode == GM_LOSESTATE) {
-		// stats.array[MATCHES_LOST]++;
+		save_game();
 		draw_rect(0, 0, 60, 30, 0x006400);
 		if (is_player2_ai) draw_text("YOU LOST", -21, 12, 1, 0xffffff);
 		else draw_text("PLAYER II WON", -36, 12, 1, 0xffffff);

@@ -82,16 +82,23 @@ enum Menumode {
 Menumode current_menumode = MN_MAIN;
 int hot_gameplay_button;
 int hot_menu_button;
+int view_stats_menu;
 int hot_quit_button;
 bool game_paused = false;
 
 // --------------------- Player stats ----------------------------
 enum Player_Stats {
-	NUM_OF_MATCHES,
-	MATCHES_WON,
-	MATCHES_LOST,
-	POINTS_SCORED,
-	POINTS_LOST,
+	NUM_OF_MATCHES1,
+	MATCHES_WON1,
+	MATCHES_LOST1,
+	POINTS_SCORED1,
+	POINTS_LOST1,
+
+	NUM_OF_MATCHES2,
+	MATCHES_WON2,
+	MATCHES_LOST2,
+	POINTS_SCORED2,
+	POINTS_LOST2,
 
 	STATS_COUNT,
 };
@@ -147,14 +154,14 @@ os_read_entire_file(const char* file_path) {
 
 internal String
 os_read_save_file() {
-	return os_read_entire_file("save.pong");
+	return os_read_entire_file("save.pongsav");
 }
 
 internal int
 os_write_save_file(String data) {
 	int result = false;
 
-	HANDLE file_handle = CreateFileA("./save.pong", GENERIC_WRITE, 0, 0, CREATE_ALWAYS, 0, 0);
+	HANDLE file_handle = CreateFileA("save.pongsav", GENERIC_WRITE, 0, 0, CREATE_ALWAYS, 0, 0);
 	if (file_handle == INVALID_HANDLE_VALUE) {
 		assert(0);
 		return result;
@@ -255,8 +262,9 @@ manage_menu(Input* input) {
 		// Select gamemode to enter gameplay
 		if (pressed(BUTTON_ENTER)) {
 			current_gamemode = GM_GAMEPLAY;
-			save_data.stats[NUM_OF_MATCHES]++;                      // Entry point for GM_GAMEPLAY so increase stats here
+			save_data.stats[NUM_OF_MATCHES1]++;                      // Entry point for GM_GAMEPLAY so increase stats here
 			is_player2_ai = hot_gameplay_button ? 0 : 1;
+			if (!is_player2_ai) save_data.stats[NUM_OF_MATCHES2]++;  // If Player 2 is not AI, increase the stats here
 		}
 
 		// Single Player Selected
@@ -278,29 +286,66 @@ manage_menu(Input* input) {
 	// Stats Menu
 	else if (current_menumode == MN_STATS) {
 		load_game();
-		// Stats Menu Header
-		draw_rect(-2, 37, 42, 8, 0x000000);
-		draw_text("PLAYER STATS", -36, 40, 1, 0xffffff);
 
 		// Go back to Main Menu
 		if (pressed(BUTTON_ESC)) {
 			current_menumode = MN_MAIN;
 		}
 
-		draw_text("MATCHES PLAYED", -80, 20, 0.75, 0xffffff);
-		draw_number(save_data.stats[NUM_OF_MATCHES], 0, 18, 1.2, 0xff0000);
+		// Stats Menu Header
+		draw_rect(0, 37, 48, 8, 0x000000);
 
-		draw_text("MATCHES WON", -80, 5, 0.75, 0xffffff);
-		draw_number(save_data.stats[MATCHES_WON], 0, 3, 1.2, 0xff0000);
+		if (pressed(BUTTON_UP) || pressed(BUTTON_DOWN))
+			view_stats_menu = !view_stats_menu;
 
-		draw_text("MATCHES LOST", -80, -10, 0.75, 0xffffff);
-		draw_number(save_data.stats[MATCHES_LOST], 0, -12, 1.2, 0xff0000);
+		// Common Text to be rendered
+		{
+			draw_text("MATCHES PLAYED", -80, 20, 0.75, 0xffffff);
+			draw_text("MATCHES WON", -80, 5, 0.75, 0xffffff);
+			draw_text("MATCHES LOST", -80, -10, 0.75, 0xffffff);
+			draw_text("POINTS SCORED", -80, -25, 0.75, 0xffffff);
+			draw_text("POINTS LOST", -80, -40, 0.75, 0xffffff);
+		}
 
-		draw_text("POINTS SCORED", -80, -25, 0.75, 0xffffff);
-		draw_number(save_data.stats[POINTS_SCORED], 0, -27, 1.2, 0xff0000);
+		// View Stats for Player 1
+		if (!view_stats_menu) {
+			draw_text("PLAYER I STATS", -40, 40, 1, 0xffffff);
 
-		draw_text("POINTS LOST", -80, -40, 0.75, 0xffffff);
-		draw_number(save_data.stats[POINTS_LOST], 0, -42, 1.2, 0xff0000);
+			// Matches played by Player 1
+			draw_number(save_data.stats[NUM_OF_MATCHES1], 0, 18, 1.2, 0xff0000);
+
+			// Matches won by Player 1
+			draw_number(save_data.stats[MATCHES_WON1], 0, 3, 1.2, 0xff0000);
+
+			// Matches lost by Player 1
+			draw_number(save_data.stats[MATCHES_LOST1], 0, -12, 1.2, 0xff0000);
+
+			// Points scored by Player 1
+			draw_number(save_data.stats[POINTS_SCORED1], 0, -27, 1.2, 0xff0000);
+
+			// Points lost by Player 1
+			draw_number(save_data.stats[POINTS_LOST1], 0, -42, 1.2, 0xff0000);
+		}
+
+		// View Stats for Player 2
+		else {
+			draw_text("PLAYER II STATS", -43, 40, 1, 0xffffff);
+
+			// Matches played by Player 2
+			draw_number(save_data.stats[NUM_OF_MATCHES2], 0, 18, 1.2, 0xff0000);
+
+			// Matches won by Player 2
+			draw_number(save_data.stats[MATCHES_WON2], 0, 3, 1.2, 0xff0000);
+
+			// Matches lost by Player 2
+			draw_number(save_data.stats[MATCHES_LOST2], 0, -12, 1.2, 0xff0000);
+
+			// Points scored by Player 2
+			draw_number(save_data.stats[POINTS_SCORED2], 0, -27, 1.2, 0xff0000);
+
+			// Points lost by Player 2
+			draw_number(save_data.stats[POINTS_LOST2], 0, -42, 1.2, 0xff0000);
+		}
 	}
 
 	// Quit Menu
@@ -553,9 +598,11 @@ simulate_game(Input* input, float dt) {
 					ball_dpx = -100.f;
 					ball_dpy = currTime % 2 ? 30.f : -30.f; // Randomly decided spawn velocity direction of ball after reset
 					player2_score++;
-					save_data.stats[POINTS_LOST]++;
+					save_data.stats[POINTS_LOST1]++;
+					if (!is_player2_ai) save_data.stats[POINTS_SCORED2]++;
 					if (player2_score == win_score) {
-						save_data.stats[MATCHES_LOST]++;
+						save_data.stats[MATCHES_LOST1]++;
+						if (!is_player2_ai) save_data.stats[MATCHES_WON2]++;
 						current_gamemode = GM_LOSESTATE;
 					}
 				}
@@ -565,9 +612,11 @@ simulate_game(Input* input, float dt) {
 					ball_dpx = 100.f;
 					ball_dpy = currTime % 2 ? -30.f : 30.f; // Randomly decided spawn velocity direction of ball after reset
 					player1_score++;
-					save_data.stats[POINTS_SCORED]++;
+					save_data.stats[POINTS_SCORED1]++;
+					if (!is_player2_ai) save_data.stats[POINTS_LOST2]++;
 					if (player1_score == win_score) {
-						save_data.stats[MATCHES_WON]++;
+						save_data.stats[MATCHES_WON1]++;
+						if (!is_player2_ai) save_data.stats[MATCHES_LOST2]++;
 						current_gamemode = GM_WINSTATE;
 					}
 				}

@@ -42,13 +42,26 @@ float ball_hsx = 1.f;
 float ball_hsy = 1.f;
 float ball_py = 0.f, ball_dpy = 1.f;
 float ball_px = 0.f, ball_dpx = 100.f;
-float ball_max_speed_x = 175.f;
+
+// Ball Collision Coefficients
+float ball_max_speed_x = 135.f;
 float ball_min_speed_x = 25.f;
+float ball_max_speed_y = 160.f;
+float front_hit_coeff_x = -1.01f;       // Velocity dir should flip when ball hits the front side
+float back_hit_coeff_x = 1.1f;          // Veclocity dir should remain the same when ball hits the back side
+float player_transfer_coeff_x = .5f;
+float player_transfer_coeff_y = .75f;
+float ball_pos_transfer_coeff_y = 1.5f;
 
 // Common Player Data
 float player_hsx = 2.5f;
 float player_hsy = 12.f;
 float player_px = 80.f;
+#define player_fixed_ddpx 300.f
+#define player_fixed_ddpy 600.f
+#define player_friction_coeff 1.6f
+
+// Gameplay Data
 const int win_score = 21;         // Default 21 pts is the win condition
 float arena_coverage = .6f;       // Default 60% of each arena side allowed to move in
 bool is_player1_ai = false;       // By default, player 1 is for the user
@@ -397,8 +410,8 @@ simulate_player(float* player_py, float* player_dpy, float player_ddpy,
 	float* player_px, float* player_dpx, float player_ddpx, float dt) {
 
 	// Friction:-
-	player_ddpy -= *player_dpy * 1.5f; // Friction Coeff is 1.5
-	player_ddpx -= *player_dpx * 1.5f; // Friction Coeff is 1.5
+	player_ddpy -= *player_dpy * player_friction_coeff; // Friction Coeff is 1.5
+	player_ddpx -= *player_dpx * player_friction_coeff; // Friction Coeff is 1.5
 
 	// Equations of motion:-
 	*player_py = *player_py + (*player_dpy * dt) + (player_ddpy * dt * dt * .5f);
@@ -530,25 +543,21 @@ simulate_game(Input* input, float dt) {
 				ball_py += ball_dpy * dt;
 
 				// Ball Collision with Players :-
-				float back_hit_coeff_x = -1.1f;
-				float front_hit_coeff_x = 1.1f;
-				float player_transfer_coeff_x = .5f;
-				float player_transfer_coeff_y = .75f;
-				float ball_pos_transfer_coeff_y = 1.5f;
+
 				// aabb_vs_aabb() checks if there is a collision on any side
 				if (aabb_vs_aabb(ball_px, ball_py, ball_hsx, ball_hsy, player1_px, player1_py, player_hsx, player_hsy)) {
 
 					player1_hit_ball = true;        // Set hit ball state for player 1 to be true
 					player2_hit_ball = false;       // Reset hit ball state for player 2 to allow AI movement
 
-					if (player1_px > ball_px) {     // If the ball collides on the left side of player 1
-						ball_dpx *= back_hit_coeff_x;
-						ball_px = player1_px - player_hsx - ball_hsy;
-					}
-					else {                          // If the ball collides on the right side of player 1
+					if (player1_px > ball_px) {     // If the ball collides on the left (front) side of player 1
 						ball_dpx *= front_hit_coeff_x;
 						ball_dpx += player1_dpx * player_transfer_coeff_x;
-						ball_px = player1_px + player_hsx + ball_hsy;
+						ball_px = player1_px - player_hsx - ball_hsx;
+					}
+					else {                          // If the ball collides on the right (back) side of player 1
+						ball_dpx *= back_hit_coeff_x;
+						ball_px = player1_px + player_hsx + ball_hsx;
 					}
 					ball_dpy = player1_dpy * player_transfer_coeff_y;  // Bouncing back effect
 					ball_dpy += ball_pos_transfer_coeff_y * (ball_py - player1_py);
@@ -558,15 +567,14 @@ simulate_game(Input* input, float dt) {
 					player2_hit_ball = true;        // Set hit ball state for player 2 to be true
 					player1_hit_ball = false;
 
-					if (player2_px < ball_px) {     // If the ball collides on the right side of player 2
-						ball_dpx *= back_hit_coeff_x;
-
-						ball_px = player2_px + player_hsx + ball_hsy;
-					}
-					else {                          // If the ball collides on the left side of player 2
+					if (player2_px < ball_px) {     // If the ball collides on the right (front) side of player 2
 						ball_dpx *= front_hit_coeff_x;
 						ball_dpx += player2_dpx * player_transfer_coeff_x;
-						ball_px = player2_px - player_hsx - ball_hsy;
+						ball_px = player2_px + player_hsx + ball_hsx;
+					}
+					else {                          // If the ball collides on the left (back) side of player 2
+						ball_dpx *= back_hit_coeff_x;
+						ball_px = player2_px - player_hsx - ball_hsx;
 					}
 					ball_dpy = player2_dpy * player_transfer_coeff_y;  // Bouncing back effect
 					ball_dpy += ball_pos_transfer_coeff_y * (ball_py - player2_py);
@@ -577,6 +585,10 @@ simulate_game(Input* input, float dt) {
 				else if (ball_dpx < -ball_max_speed_x) ball_dpx = -ball_max_speed_x;
 				else if (ball_dpx > 0 && ball_dpx < ball_min_speed_x) ball_dpx = ball_min_speed_x;
 				else if (ball_dpx < 0 && ball_dpx > -ball_min_speed_x) ball_dpx = -ball_min_speed_x;
+
+				// Clamping ball's y velocity to prevent large built-up speeds
+				if (ball_dpy > ball_max_speed_y) ball_dpy = ball_max_speed_y;
+				else if (ball_dpy < -ball_max_speed_y) ball_dpy = -ball_max_speed_y;
 
 				// Ball Collision with Arena Top and Bottom
 				if (ball_py + ball_hsy > arena_half_size_y) {
@@ -627,10 +639,10 @@ simulate_game(Input* input, float dt) {
 			// ------------- (6) Player 1 Simulation ----------------------
 			float player1_ddpy = 0.f, player1_ddpx = 0.f;
 			if (!is_player1_ai) {
-				if (is_down(BUTTON_UP)) player1_ddpy += 650.f;
-				if (is_down(BUTTON_DOWN)) player1_ddpy -= 650.f;
-				if (is_down(BUTTON_RIGHT)) player1_ddpx += 350.f;
-				if (is_down(BUTTON_LEFT)) player1_ddpx -= 350.f;
+				if (is_down(BUTTON_UP)) player1_ddpy += player_fixed_ddpy;
+				if (is_down(BUTTON_DOWN)) player1_ddpy -= player_fixed_ddpy;
+				if (is_down(BUTTON_RIGHT)) player1_ddpx += player_fixed_ddpx;
+				if (is_down(BUTTON_LEFT)) player1_ddpx -= player_fixed_ddpx;
 			}
 			else {
 				simulate_ai(&player1_px, &player1_py, &player1_ddpx, &player1_ddpy, &player1_hit_ball);
@@ -641,10 +653,10 @@ simulate_game(Input* input, float dt) {
 			// ------------- (7) Player 2 Simulation ----------------------
 			float player2_ddpy = 0.f, player2_ddpx = 0.f;
 			if (!is_player2_ai) {
-				if (is_down(BUTTON_W)) player2_ddpy += 650.f;
-				if (is_down(BUTTON_S)) player2_ddpy -= 650.f;
-				if (is_down(BUTTON_D)) player2_ddpx += 350.f;
-				if (is_down(BUTTON_A)) player2_ddpx -= 350.f;
+				if (is_down(BUTTON_W)) player2_ddpy += player_fixed_ddpy;
+				if (is_down(BUTTON_S)) player2_ddpy -= player_fixed_ddpy;
+				if (is_down(BUTTON_D)) player2_ddpx += player_fixed_ddpx;
+				if (is_down(BUTTON_A)) player2_ddpx -= player_fixed_ddpx;
 			}
 			else {
 				simulate_ai(&player2_px, &player2_py, &player2_ddpx, &player2_ddpy, &player2_hit_ball);

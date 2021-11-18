@@ -1,19 +1,3 @@
-// <------------------------- Key State Checker Macros -------------------------------->
-
-// Button b is down if the Button_State in buttons array at index b has is_down == true
-// Deref input to get buttons array for the Button_State value BUTTON_UP to check its is_down
-// is_down() can be used to check if the key is being pressed continuously
-#define is_down(b) input->buttons[b].is_down
-
-// Button b is pressed if it is currently down and has changed from the previous frame
-// pressed() can be used to check if the key was pressed in the current frame or not
-#define pressed(b) (input->buttons[b].is_down && input->buttons[b].changed)
-
-// Button b is released if it is currently up (not down) and has changed from the previous frame
-// released() can be used to check if the key was released in the current frame or not
-#define released(b) (!input->buttons[b].is_down && input->buttons[b].changed)
-// <----------------------------------------------------------------------------------->
-
 
 // <------------------------- Game Simulation ----------------------------------------->
 
@@ -23,8 +7,7 @@ enum Gamemode {
 	GM_GAMEPLAY,
 	GM_PAUSED,
 	GM_QUIT,
-	GM_WINSTATE,
-	GM_LOSESTATE,
+	GM_ENDSTATE,
 };
 
 Gamemode current_gamemode = GM_MENU;
@@ -59,13 +42,21 @@ float player_hsy = 12.f;
 float player_px = 80.f;
 #define player_fixed_ddpx 300.f
 #define player_fixed_ddpy 600.f
-#define player_friction_coeff 1.6f
+#define player_friction_coeff 1.75f
 
 // Gameplay Data
-const int win_score = 21;         // Default 21 pts is the win condition
-float arena_coverage = .6f;       // Default 60% of each arena side allowed to move in
-bool is_player1_ai = false;       // By default, player 1 is for the user
-bool is_player2_ai = true;        // By default, player 2 is the AI
+const int win_score = 21;                 // Default 21 pts is the win condition
+float arena_coverage = .6f;               // Default 60% of each arena side allowed to move in
+bool is_player1_ai = false;               // By default, player 1 is for the user
+bool is_player2_ai = true;                // By default, player 2 is the AI
+
+enum PlayerNum {
+	PLAYER_NULL,
+	PLAYER_ONE,
+	PLAYER_TWO,
+};
+
+PlayerNum which_player_won = PLAYER_NULL; // By default, no player has won
 
 // ------------------ (2) Player1 data ---------------------------
 float player1_py, player1_dpy;          // Speed in units per second
@@ -100,307 +91,10 @@ int hot_quit_button;
 bool game_paused = false;
 
 // --------------------- Player stats ----------------------------
-enum Player_Stats {
-	NUM_OF_MATCHES1,
-	MATCHES_WON1,
-	MATCHES_LOST1,
-	POINTS_SCORED1,
-	POINTS_LOST1,
-
-	NUM_OF_MATCHES2,
-	MATCHES_WON2,
-	MATCHES_LOST2,
-	POINTS_SCORED2,
-	POINTS_LOST2,
-
-	STATS_COUNT,
-};
-
-struct {
-	char* data;
-	unsigned int size;
-} typedef String;
-
-struct {
-	u32 version;
-	unsigned int stats[STATS_COUNT];
-} typedef Save_Data;
-
-Save_Data save_data = {};
-
-// ------------ Helper Functions for Stats -----------------------
-#include <cassert>
-
-internal void
-os_free_file(String s) {
-	VirtualFree(s.data, 0, MEM_RELEASE);
-}
-
-internal String
-os_read_entire_file(const char* file_path) {
-	String result = { 0 };
-
-	HANDLE file_handle = CreateFileA(file_path, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0);
-	if (file_handle == INVALID_HANDLE_VALUE) {
-		CloseHandle(file_handle);
-		return result;
-	}
-
-	DWORD file_size = GetFileSize(file_handle, 0);
-	result.size = file_size;
-	result.data = (char*)VirtualAlloc(0, result.size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-
-
-	DWORD bytes_read;
-	if (ReadFile(file_handle, result.data, file_size, &bytes_read, 0) && file_size == bytes_read) {
-		// Success;
-
-	}
-	else {
-		// @Incomplete: error message?
-		assert(0);
-	}
-
-	CloseHandle(file_handle);
-	return result;
-}
-
-internal String
-os_read_save_file() {
-	return os_read_entire_file("save.pongsav");
-}
-
-internal int
-os_write_save_file(String data) {
-	int result = false;
-
-	HANDLE file_handle = CreateFileA("save.pongsav", GENERIC_WRITE, 0, 0, CREATE_ALWAYS, 0, 0);
-	if (file_handle == INVALID_HANDLE_VALUE) {
-		assert(0);
-		return result;
-	}
-
-	DWORD bytes_written;
-	result = WriteFile(file_handle, data.data, (DWORD)data.size, &bytes_written, 0) && bytes_written == data.size;
-
-	CloseHandle(file_handle);
-	return result;
-}
-
-internal void
-load_game() {
-	String input = os_read_save_file();
-	if (input.size) {
-		u32 version = *(u32*)input.data;
-		save_data = *(Save_Data*)input.data;
-	}
-}
-
-internal void
-save_game() {
-	// Do that async
-	String data;
-	data.data = (char*)&save_data;
-	data.size = sizeof(save_data);
-	os_write_save_file(data);
-}
+#include "save_stats.cpp"
 
 // -------------------- Menu Function ----------------------------
-// Todo: Refactor into cleaner version
-internal void
-manage_menu(Input* input) {
-	clear_screen(0x006400);
-
-	// Main Menu
-	if (current_menumode == MN_MAIN) {
-		// Main Menu Header
-		draw_rect(1, 35, 60, 15, 0x000000);
-		draw_text("PING PONG", -50, 40, 2, 0xffffff);
-
-		// Navigation between the three options
-		if (pressed(BUTTON_UP)) {
-			hot_menu_button = (3 + hot_menu_button - 1) % 3;
-		}
-
-		if (pressed(BUTTON_DOWN)) {
-			hot_menu_button = (hot_menu_button + 1) % 3;
-		}
-
-		// Play Game Selected
-		if (hot_menu_button == 0) {
-			draw_rect(-5, -2, 32, 8, 0x000000);
-			draw_text("PLAY GAME", -30, 1, 1, 0xff0000);
-			if (pressed(BUTTON_ENTER)) current_menumode = MN_PLAY;
-
-			draw_text("VIEW STATS", -33, -20, 1, 0xffffff);
-			draw_text("QUIT", -15, -38, 1, 0xffffff);
-		}
-		// View Stats Selected
-		else if (hot_menu_button == 1) {
-			draw_text("PLAY GAME", -30, 0, 1, 0xffffff);
-
-			draw_rect(-5, -22, 33, 8, 0x000000);
-			draw_text("VIEW STATS", -33, -19, 1, 0xff0000);
-			if (pressed(BUTTON_ENTER)) current_menumode = MN_STATS;
-
-			draw_text("QUIT", -15, -38, 1, 0xffffff);
-		}
-		// Quit Menu Selected
-		else if (hot_menu_button == 2) {
-			draw_text("PLAY GAME", -30, 0, 1, 0xffffff);
-			draw_text("VIEW STATS", -33, -20, 1, 0xffffff);
-
-			draw_rect(-5, -40, 15, 8, 0x000000);
-			draw_text("QUIT", -15, -37, 1, 0xff0000);
-			if (pressed(BUTTON_ENTER)) current_menumode = MN_QUIT;
-		}
-	}
-
-	// Play Game Menu
-	else if (current_menumode == MN_PLAY) {
-		// Play Game Menu Header
-		draw_rect(1, 35, 60, 15, 0x000000);
-		draw_text("GAME MODE", -50, 40, 2, 0xffffff);
-
-		// Go back to Main Menu
-		if (pressed(BUTTON_ESC)) {
-			current_menumode = MN_MAIN;
-		}
-
-		// Navigation between the two options
-		if (pressed(BUTTON_LEFT) || pressed(BUTTON_RIGHT)) {
-			hot_gameplay_button = !hot_gameplay_button;
-		}
-
-		// Select gamemode to enter gameplay
-		if (pressed(BUTTON_ENTER)) {
-			current_gamemode = GM_GAMEPLAY;
-			save_data.stats[NUM_OF_MATCHES1]++;                      // Entry point for GM_GAMEPLAY so increase stats here
-			is_player2_ai = hot_gameplay_button ? 0 : 1;
-			if (!is_player2_ai) save_data.stats[NUM_OF_MATCHES2]++;  // If Player 2 is not AI, increase the stats here
-		}
-
-		// Single Player Selected
-		if (hot_gameplay_button == 0) {
-			draw_rect(-42, -12, 42, 8, 0x000000);
-			draw_text("SINGLE PLAYER", -80, -9, 1, 0xff0000);
-
-			draw_text("MULTIPLAYER", 20, -10, 1, 0xffffff);
-		}
-		// Multiplayer Selected
-		else {
-			draw_text("SINGLE PLAYER", -80, -10, 1, 0xffffff);
-
-			draw_rect(52, -12, 37, 8, 0x000000);
-			draw_text("MULTIPLAYER", 20, -9, 1, 0xff0000);
-		}
-	}
-
-	// Stats Menu
-	else if (current_menumode == MN_STATS) {
-		load_game();
-
-		// Go back to Main Menu
-		if (pressed(BUTTON_ESC)) {
-			current_menumode = MN_MAIN;
-		}
-
-		// Stats Menu Header
-		draw_rect(0, 37, 48, 8, 0x000000);
-
-		if (pressed(BUTTON_UP) || pressed(BUTTON_DOWN))
-			view_stats_menu = !view_stats_menu;
-
-		// Common Text to be rendered
-		{
-			draw_text("MATCHES PLAYED", -80, 20, 0.75, 0xffffff);
-			draw_text("MATCHES WON", -80, 5, 0.75, 0xffffff);
-			draw_text("MATCHES LOST", -80, -10, 0.75, 0xffffff);
-			draw_text("POINTS SCORED", -80, -25, 0.75, 0xffffff);
-			draw_text("POINTS LOST", -80, -40, 0.75, 0xffffff);
-		}
-
-		// View Stats for Player 1
-		if (!view_stats_menu) {
-			draw_text("PLAYER I STATS", -40, 40, 1, 0xffffff);
-
-			// Matches played by Player 1
-			draw_number(save_data.stats[NUM_OF_MATCHES1], 0, 18, 1.2, 0xff0000);
-
-			// Matches won by Player 1
-			draw_number(save_data.stats[MATCHES_WON1], 0, 3, 1.2, 0xff0000);
-
-			// Matches lost by Player 1
-			draw_number(save_data.stats[MATCHES_LOST1], 0, -12, 1.2, 0xff0000);
-
-			// Points scored by Player 1
-			draw_number(save_data.stats[POINTS_SCORED1], 0, -27, 1.2, 0xff0000);
-
-			// Points lost by Player 1
-			draw_number(save_data.stats[POINTS_LOST1], 0, -42, 1.2, 0xff0000);
-		}
-
-		// View Stats for Player 2
-		else {
-			draw_text("PLAYER II STATS", -43, 40, 1, 0xffffff);
-
-			// Matches played by Player 2
-			draw_number(save_data.stats[NUM_OF_MATCHES2], 0, 18, 1.2, 0xff0000);
-
-			// Matches won by Player 2
-			draw_number(save_data.stats[MATCHES_WON2], 0, 3, 1.2, 0xff0000);
-
-			// Matches lost by Player 2
-			draw_number(save_data.stats[MATCHES_LOST2], 0, -12, 1.2, 0xff0000);
-
-			// Points scored by Player 2
-			draw_number(save_data.stats[POINTS_SCORED2], 0, -27, 1.2, 0xff0000);
-
-			// Points lost by Player 2
-			draw_number(save_data.stats[POINTS_LOST2], 0, -42, 1.2, 0xff0000);
-		}
-	}
-
-	// Quit Menu
-	else if (current_menumode == MN_QUIT) {
-		// Quit Menu Header
-		draw_rect(1, 35, 60, 15, 0x000000);
-		draw_text("QUIT GAME", -50, 40, 2, 0xffffff);
-
-		draw_text("I WANT TO QUIT THE GAME", -68, 5, 1, 0xffffff);
-
-		// Go back to Main Menu
-		if (pressed(BUTTON_ESC)) {
-			current_menumode = MN_MAIN;
-		}
-
-		// Navigation between the two options
-		if (pressed(BUTTON_LEFT) || pressed(BUTTON_RIGHT)) {
-			hot_quit_button = !hot_quit_button;
-		}
-
-		// Select whether to quit or not
-		if (pressed(BUTTON_ENTER)) {
-			if (hot_quit_button == 0) running = false;
-			else current_menumode = MN_MAIN;
-		}
-
-		// Yes Selected
-		if (hot_quit_button == 0) {
-			draw_rect(-22, -18, 20, 8, 0x000000);
-			draw_text("YES", -30, -15, 1, 0xff0000);
-
-			draw_text("NO", 20, -16, 1, 0xffffff);
-		}
-		// No Selected
-		else {
-			draw_text("YES", -30, -16, 1, 0xffffff);
-
-			draw_rect(26, -18, 20, 8, 0x000000);
-			draw_text("NO", 20, -15, 1, 0xff0000);
-		}
-	}
-}
+#include "menu.cpp"
 
 // ------------------ (4) Helper Functions -----------------------
 
@@ -410,8 +104,8 @@ simulate_player(float* player_py, float* player_dpy, float player_ddpy,
 	float* player_px, float* player_dpx, float player_ddpx, float dt) {
 
 	// Friction:-
-	player_ddpy -= *player_dpy * player_friction_coeff; // Friction Coeff is 1.5
-	player_ddpx -= *player_dpx * player_friction_coeff; // Friction Coeff is 1.5
+	player_ddpy -= (*player_dpy * player_friction_coeff);
+	player_ddpx -= (*player_dpx * player_friction_coeff);
 
 	// Equations of motion:-
 	*player_py = *player_py + (*player_dpy * dt) + (player_ddpy * dt * dt * .5f);
@@ -590,7 +284,7 @@ simulate_game(Input* input, float dt) {
 				if (ball_dpy > ball_max_speed_y) ball_dpy = ball_max_speed_y;
 				else if (ball_dpy < -ball_max_speed_y) ball_dpy = -ball_max_speed_y;
 
-				// Ball Collision with Arena Top and Bottom
+				// Ball Collision with Arena Top and Bottom => Affects ball_dpy
 				if (ball_py + ball_hsy > arena_half_size_y) {
 					ball_py = arena_half_size_y - ball_hsy;
 					ball_dpy *= -1;                 // Bouncing back effect
@@ -606,6 +300,8 @@ simulate_game(Input* input, float dt) {
 				int currTime = curr_time.QuadPart;    // Convert time stamp to integer
 
 				// Reset: Ball Collision with Arena Left and Right
+
+				// Player 1 lost point, Player 2 scored point
 				if (ball_px + ball_hsx > 99.f) {            // Ball collision with right side of screen instead of arena
 					ball_px = 0;
 					ball_py = 0;
@@ -614,12 +310,15 @@ simulate_game(Input* input, float dt) {
 					player2_score++;
 					save_data.stats[POINTS_LOST1]++;
 					if (!is_player2_ai) save_data.stats[POINTS_SCORED2]++;
+					// Player 1 lost, Player 2 won
 					if (player2_score == win_score) {
 						save_data.stats[MATCHES_LOST1]++;
 						if (!is_player2_ai) save_data.stats[MATCHES_WON2]++;
-						current_gamemode = GM_LOSESTATE;
+						which_player_won = PLAYER_TWO;
+						current_gamemode = GM_ENDSTATE;
 					}
 				}
+				// Player 1 scored point, Player 2 lost point
 				else if (ball_px + ball_hsx < -99.f) {      // Ball collision with left side of screen instead of arena
 					ball_px = 0;
 					ball_py = 0;
@@ -628,10 +327,12 @@ simulate_game(Input* input, float dt) {
 					player1_score++;
 					save_data.stats[POINTS_SCORED1]++;
 					if (!is_player2_ai) save_data.stats[POINTS_LOST2]++;
+					// Player 1 won, Player 2 lost
 					if (player1_score == win_score) {
 						save_data.stats[MATCHES_WON1]++;
 						if (!is_player2_ai) save_data.stats[MATCHES_LOST2]++;
-						current_gamemode = GM_WINSTATE;
+						which_player_won = PLAYER_ONE;
+						current_gamemode = GM_ENDSTATE;
 					}
 				}
 			}
@@ -690,9 +391,10 @@ simulate_game(Input* input, float dt) {
 		draw_text("I WANT TO QUIT THE GAME", -68, 15, 1, 0xffffff);
 
 		// Navigation between the two options
-		if (pressed(BUTTON_LEFT) || pressed(BUTTON_RIGHT)) {
-			hot_quit_button = !hot_quit_button;
-		}
+		//if (pressed(BUTTON_LEFT) || pressed(BUTTON_RIGHT)) {
+		//	hot_quit_button = !hot_quit_button;
+		//}
+		move_hot_button(input, 2, hot_quit_button, BUTTON_LEFT, BUTTON_RIGHT);
 
 		// Select whether to quit or not
 		if (pressed(BUTTON_ENTER)) {
@@ -719,27 +421,23 @@ simulate_game(Input* input, float dt) {
 
 	// ------------------ Menu System -------------------------------------
 	else if (current_gamemode == GM_MENU) {
+		load_game();
 		manage_menu(input);
 	}
 
-	else if (current_gamemode == GM_WINSTATE) {
+	// ------------------ Endgame Management ------------------------------
+	else if (current_gamemode == GM_ENDSTATE) {
 		save_game();
 		draw_rect(0, 0, 60, 30, 0x006400);
-		if (is_player2_ai) draw_text("YOU WON", -19, 12, 1, 0xffffff);
-		else draw_text("PLAYER I WON", -35, 12, 1, 0xffffff);
 
-		draw_rect(1, -11, 20, 8, 0x000000);
-		draw_text("OK", -4, -8, 1, 0xff0000);
-		if pressed(BUTTON_ENTER) {
-			reset_game();
+		if (which_player_won == PLAYER_ONE) {
+			if (is_player2_ai) draw_text("YOU WON", -19, 12, 1, 0xffffff);
+			else draw_text("PLAYER I WON", -35, 12, 1, 0xffffff);
 		}
-	}
-
-	else if (current_gamemode == GM_LOSESTATE) {
-		save_game();
-		draw_rect(0, 0, 60, 30, 0x006400);
-		if (is_player2_ai) draw_text("YOU LOST", -21, 12, 1, 0xffffff);
-		else draw_text("PLAYER II WON", -36, 12, 1, 0xffffff);
+		else if (which_player_won == PLAYER_TWO) {
+			if (is_player2_ai) draw_text("YOU LOST", -21, 12, 1, 0xffffff);
+			else draw_text("PLAYER II WON", -36, 12, 1, 0xffffff);
+		}
 
 		draw_rect(1, -11, 20, 8, 0x000000);
 		draw_text("OK", -4, -8, 1, 0xff0000);
